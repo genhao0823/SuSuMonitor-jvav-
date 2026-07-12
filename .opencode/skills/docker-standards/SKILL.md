@@ -10,29 +10,13 @@ description: Docker 规范。当在 SuSuMonitor 项目目录下编写 Dockerfile
 ### 基础镜像
 - 使用官方镜像，指定具体版本，避免 `latest`
 - 优先使用 `alpine` 版本减小镜像体积
-- Go 后端使用多阶段构建
+- Java 后端容器化时优先使用多阶段构建
 
-### 多阶段构建示例
+### Java 后端构建提示
 
-```dockerfile
-# 构建阶段
-FROM golang:1.22-alpine AS builder
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 go build -o server ./cmd/server/
-
-# 运行阶段
-FROM alpine:3.20
-RUN apk --no-cache add ca-certificates tzdata \
-    && addgroup -S app \
-    && adduser -S app -G app
-COPY --from=builder /app/server /usr/local/bin/server
-USER app
-EXPOSE 8080
-CMD ["server"]
-```
+- 构建阶段使用 Maven 和 JDK 镜像。
+- 运行阶段使用 JRE 镜像。
+- 最终镜像只复制构建产物，不复制源码、测试报告、`.env` 或本地缓存。
 
 ### 前端构建示例
 

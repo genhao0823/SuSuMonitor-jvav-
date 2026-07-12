@@ -1,0 +1,254 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SuSuMonitor System API",
+    "description": "SuSuMonitor system API for Apifox import and local testing.",
+    "version": "0.1.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:18080",
+      "description": "Local development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "system",
+      "description": "System health and readiness checks"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": ["system"],
+        "summary": "Health check",
+        "description": "Checks whether the backend application is alive. This endpoint does not depend on the database.",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Application is alive",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "code": 0,
+                  "message": "success",
+                  "data": {
+                    "status": "UP",
+                    "application": "susumonitor",
+                    "timestamp": "2026-07-13T10:00:00+08:00"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/ready": {
+      "get": {
+        "tags": ["system"],
+        "summary": "Readiness check",
+        "description": "Checks whether the backend application and database connection are ready.",
+        "operationId": "getReady",
+        "responses": {
+          "200": {
+            "description": "Application and database are ready",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                },
+                "example": {
+                  "code": 0,
+                  "message": "success",
+                  "data": {
+                    "status": "UP",
+                    "database": "ok",
+                    "timestamp": "2026-07-13T10:00:00+08:00"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database is unavailable or an internal server error occurred",
+            "headers": {
+              "X-Request-ID": {
+                "$ref": "#/components/headers/XRequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "databaseError": {
+                    "summary": "Database connection failed",
+                    "value": {
+                      "code": 50001,
+                      "message": "database error",
+                      "data": null
+                    }
+                  },
+                  "internalServerError": {
+                    "summary": "Internal server error",
+                    "value": {
+                      "code": 50000,
+                      "message": "internal server error",
+                      "data": null
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "headers": {
+      "XRequestId": {
+        "description": "Request trace ID. The client may send X-Request-ID, and the backend returns it in the response header.",
+        "schema": {
+          "type": "string",
+          "example": "6f4e8d9d-2d0a-4d11-8b7d-9f8d2f5f2f4a"
+        }
+      }
+    },
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "required": ["code", "message", "data"],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32",
+            "example": 0
+          },
+          "message": {
+            "type": "string",
+            "example": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/HealthStatus"
+          }
+        }
+      },
+      "ReadyResponse": {
+        "type": "object",
+        "required": ["code", "message", "data"],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32",
+            "example": 0
+          },
+          "message": {
+            "type": "string",
+            "example": "success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReadyStatus"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32",
+            "example": 50001
+          },
+          "message": {
+            "type": "string",
+            "example": "database error"
+          },
+          "data": {
+            "nullable": true,
+            "example": null
+          }
+        }
+      },
+      "HealthStatus": {
+        "type": "object",
+        "required": ["status", "application", "timestamp"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "UP"
+          },
+          "application": {
+            "type": "string",
+            "example": "susumonitor"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-07-13T10:00:00+08:00"
+          }
+        }
+      },
+      "ReadyStatus": {
+        "type": "object",
+        "required": ["status", "database", "timestamp"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "UP"
+          },
+          "database": {
+            "type": "string",
+            "example": "ok"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-07-13T10:00:00+08:00"
+          }
+        }
+      }
+    },
+    "responses": {
+      "InternalServerError": {
+        "description": "Internal server error",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/XRequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "code": 50000,
+              "message": "internal server error",
+              "data": null
+            }
+          }
+        }
+      }
+    }
+  }
+}

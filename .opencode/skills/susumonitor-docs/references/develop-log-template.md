@@ -16,8 +16,8 @@
 
 ## 涉及文件
 
-- path/to/file1.go
-- path/to/file2.go
+- server-java-SuMon/src/main/java/com/susumonitor/server/module/example/ExampleController.java
+- docs-SuMon/OpenApi-SuMon/openapi-example.json
 
 ## 当前进度
 

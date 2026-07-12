@@ -1,6 +1,6 @@
 ---
 name: mysql-standards
-description: MySQL 规范。当在 SuSuMonitor 项目目录下进行数据库设计或编写 SQL 时使用。触发场景包括：(1) 数据库表设计，(2) 编写 SQL 语句，(3) 索引设计，(4) GORM 模型定义。
+description: MySQL 规范。当在 SuSuMonitor 项目目录下进行数据库设计或编写 SQL 时使用。触发场景包括：(1) 数据库表设计，(2) 编写 SQL 语句，(3) 索引设计，(4) Flyway 迁移脚本。
 ---
 
 # MySQL 规范
@@ -61,26 +61,12 @@ CREATE TABLE `servers` (
 - 批量操作使用 `IN` 或 `VALUES` 多行，不用循环
 - 分页查询使用 `LIMIT offset, count`，大数据量用游标分页
 
-## 4. GORM 模型定义
+## 4. Flyway 迁移脚本
 
-```go
-type Server struct {
-    ID                            uint64     `gorm:"primaryKey;autoIncrement;comment:主键ID"`
-    Name                          string     `gorm:"type:varchar(100);not null;comment:服务器名称"`
-    Host                          string     `gorm:"type:varchar(255);not null;uniqueIndex;comment:服务器地址"`
-    Status                        string     `gorm:"type:varchar(20);not null;default:offline;comment:状态"`
-    SSHHost                       string     `gorm:"type:varchar(255);not null;default:'';comment:SSH地址"`
-    SSHPort                       uint       `gorm:"not null;default:22;comment:SSH端口"`
-    SSHUser                       string     `gorm:"type:varchar(100);not null;default:'';comment:SSH用户名"`
-    SSHAuthType                   string     `gorm:"type:varchar(20);not null;default:private_key;comment:SSH认证方式"`
-    SSHPasswordEncrypted          string     `gorm:"type:text;comment:SSH密码（AES加密）"`
-    SSHPrivateKeyEncrypted        string     `gorm:"type:text;comment:SSH私钥（AES加密）"`
-    SSHPrivateKeyPassphraseEncrypted string  `gorm:"type:text;comment:SSH私钥口令（AES加密）"`
-    LastHeartbeat                 *time.Time `gorm:"comment:最后心跳时间"`
-    CreatedAt                     time.Time  `gorm:"autoCreateTime;comment:创建时间"`
-    UpdatedAt                     time.Time  `gorm:"autoUpdateTime;comment:更新时间"`
-}
-```
+- 迁移脚本放在 `server-java-SuMon/src/main/resources/db/migration/`
+- 文件名使用 Flyway 规范，例如 `V1__create_users_table.sql`
+- 每个迁移脚本只做一组相关表结构变更
+- 已执行到共享环境的迁移脚本不得直接修改，应通过新的版本脚本变更
 
 ## 5. 其他
 

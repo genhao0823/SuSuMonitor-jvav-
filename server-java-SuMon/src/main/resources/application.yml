@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: ${APP_NAME:susumonitor}
+  profiles:
+    active: ${APP_ENV:local}
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:susumonitor}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=${DB_TIMEZONE:Asia/Shanghai}&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USER:susumonitor}
+    password: ${DB_PASSWORD:}
+    hikari:
+      pool-name: SuSuMonitorHikariPool
+      maximum-pool-size: 10
+      minimum-idle: 2
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+server:
+  port: ${SERVER_PORT:18080}
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  global-config:
+    banner: false
+  configuration:
+    map-underscore-to-camel-case: true
+
+susumonitor:
+  jwt:
+    secret: ${JWT_SECRET:}
+    expire-hours: ${JWT_EXPIRE_HOURS:24}
+  security:
+    aes-gcm-key: ${AES_GCM_KEY:}
+  agent:
+    register-key: ${AGENT_REGISTER_KEY:}
+  ssh:
+    connect-timeout-seconds: ${SSH_CONNECT_TIMEOUT_SECONDS:10}
+    idle-timeout-minutes: ${SSH_IDLE_TIMEOUT_MINUTES:20}
+  metrics:
+    retention-days: ${METRICS_RETENTION_DAYS:10}
+    cleanup-cron: ${METRICS_CLEANUP_CRON:0 0 3 * * ?}
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html

@@ -5,13 +5,16 @@
 
 ### System: health
 GET {{baseUrl}}/api/health
+X-Request-ID: local-health-request
 
 ### System: ready
 GET {{baseUrl}}/api/ready
+X-Request-ID: local-ready-request
 
 ### Auth: register first admin or normal user
 POST {{baseUrl}}/api/auth/register
 Content-Type: application/json
+X-Request-ID: local-register-request
 
 {
   "username": "admin",
