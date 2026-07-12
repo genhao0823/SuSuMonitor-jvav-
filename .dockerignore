@@ -1,0 +1,47 @@
+.git
+.gitignore
+.editorconfig
+
+# Secrets and local env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa
+id_rsa.pub
+secrets/
+
+# Dependencies and build outputs
+node_modules/
+dist/
+build/
+.vite/
+.cache/
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and temp
+*.log
+logs/
+tmp/
+
+# Project-local tooling dependencies
+.opencode/node_modules/
+.opencode/package.json
+.opencode/package-lock.json
+.opencode/bun.lock
+.codex/

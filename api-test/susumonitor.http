@@ -1,0 +1,116 @@
+@baseUrl = http://localhost:18080
+@token = REPLACE_WITH_JWT_TOKEN
+@serverId = 1
+@pendingUserId = 2
+
+### System: health
+GET {{baseUrl}}/api/health
+
+### System: ready
+GET {{baseUrl}}/api/ready
+
+### Auth: register first admin or normal user
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "REPLACE_WITH_PASSWORD"
+}
+
+### Auth: login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "REPLACE_WITH_PASSWORD"
+}
+
+### Auth: current user
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### Auth: logout
+POST {{baseUrl}}/api/auth/logout
+Authorization: Bearer {{token}}
+
+### Admin: pending users
+GET {{baseUrl}}/api/admin/users/pending
+Authorization: Bearer {{token}}
+
+### Admin: approve user
+PUT {{baseUrl}}/api/admin/users/{{pendingUserId}}/approve
+Authorization: Bearer {{token}}
+
+### Admin: reject user
+PUT {{baseUrl}}/api/admin/users/{{pendingUserId}}/reject
+Authorization: Bearer {{token}}
+
+### Servers: list
+GET {{baseUrl}}/api/servers?page=1&page_size=20&keyword=&sort_by=id&sort_order=desc
+Authorization: Bearer {{token}}
+
+### Servers: create
+POST {{baseUrl}}/api/servers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "local-server",
+  "host": "127.0.0.1",
+  "description": "Local development server",
+  "ssh_host": "127.0.0.1",
+  "ssh_port": 22,
+  "ssh_user": "REPLACE_WITH_SSH_USER",
+  "ssh_auth_type": "password",
+  "ssh_password": "REPLACE_WITH_SSH_PASSWORD"
+}
+
+### Servers: detail
+GET {{baseUrl}}/api/servers/{{serverId}}
+Authorization: Bearer {{token}}
+
+### Servers: update
+PUT {{baseUrl}}/api/servers/{{serverId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "local-server",
+  "host": "127.0.0.1",
+  "description": "Updated local development server",
+  "ssh_host": "127.0.0.1",
+  "ssh_port": 22,
+  "ssh_user": "REPLACE_WITH_SSH_USER",
+  "ssh_auth_type": "password",
+  "ssh_password": "REPLACE_WITH_SSH_PASSWORD"
+}
+
+### Servers: status
+GET {{baseUrl}}/api/servers/{{serverId}}/status
+Authorization: Bearer {{token}}
+
+### Servers: delete soft
+DELETE {{baseUrl}}/api/servers/{{serverId}}
+Authorization: Bearer {{token}}
+
+### SSH: test connection
+POST {{baseUrl}}/api/servers/{{serverId}}/ssh/test
+Authorization: Bearer {{token}}
+
+### Metrics: latest placeholder for MVP-3
+# GET {{baseUrl}}/api/servers/{{serverId}}/metrics/latest
+# Authorization: Bearer {{token}}
+
+### Metrics: history placeholder for MVP-3
+# GET {{baseUrl}}/api/servers/{{serverId}}/metrics
+# Authorization: Bearer {{token}}
+
+### Alerts: rules placeholder for MVP-6
+# GET {{baseUrl}}/api/alerts/rules
+# Authorization: Bearer {{token}}
+
+### Alerts: records placeholder for MVP-6
+# GET {{baseUrl}}/api/alerts/records
+# Authorization: Bearer {{token}}
