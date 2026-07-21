@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+# SuSuMonitor 前端 pre-commit 钩子
+# 提交前自动跑 OpenAPI 契约结构校验;失败则阻止本次 commit。
+
+# 切换到本脚本所在目录的 web-vue-SuMon 子目录
+# (钩子路径相对 git 根,即 SuSuMonitor(Jvav)/web-vue-SuMon/.husky/pre-commit)
+DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(dirname "$DIR")"
+
+cd "$PROJECT_DIR" || {
+  echo "[husky] 无法切换到项目目录: $PROJECT_DIR"
+  exit 1
+}
+
+echo "[husky] 跑 OpenAPI 契约校验..."
+
+# 透传 npm run 的退出码给 git;非 0 时 git 拒绝 commit
+npm run openapi:check
