@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susumonitor.server.module.metrics.service.MetricsService.MetricsReportedEvent;
 import com.susumonitor.server.module.metrics.vo.MetricsLatestVo;
 import java.io.IOException;
+import java.time.Clock;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -17,11 +17,13 @@ public class MonitorMetricsPublisher {
 
     private final ObjectMapper objectMapper;
     private final MonitorSubscriptionRegistry registry;
+    private final Clock clock;
 
     /** 注入 JSON 序列化器和订阅注册表。 */
-    public MonitorMetricsPublisher(ObjectMapper objectMapper, MonitorSubscriptionRegistry registry) {
+    public MonitorMetricsPublisher(ObjectMapper objectMapper, MonitorSubscriptionRegistry registry, Clock clock) {
         this.objectMapper = objectMapper;
         this.registry = registry;
+        this.clock = clock;
     }
 
     /** 仅在数据库事务成功提交后发送指标更新。 */
@@ -46,7 +48,7 @@ public class MonitorMetricsPublisher {
         return objectMapper.createObjectNode()
                 .put("type", "metrics.update")
                 .put("message_id", java.util.UUID.randomUUID().toString())
-                .put("timestamp", OffsetDateTime.now(ZoneOffset.UTC).toString())
+                .put("timestamp", OffsetDateTime.now(clock).toString())
                 .set("payload", payload)
                 .toString();
     }

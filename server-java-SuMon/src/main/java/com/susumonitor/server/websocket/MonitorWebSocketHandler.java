@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import com.susumonitor.server.security.AuthenticatedUser;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Component;
@@ -27,14 +29,16 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper;
     private final ServerMapper serverMapper;
     private final MonitorSubscriptionRegistry registry;
+    private final Clock clock;
     private final Map<String, MonitorWebSocketSession> sessions = new ConcurrentHashMap<>();
 
     /** 注入 JSON、服务器权限查询和订阅注册表。 */
     public MonitorWebSocketHandler(ObjectMapper objectMapper, ServerMapper serverMapper,
-            MonitorSubscriptionRegistry registry) {
+            MonitorSubscriptionRegistry registry, Clock clock) {
         this.objectMapper = objectMapper;
         this.serverMapper = serverMapper;
         this.registry = registry;
+        this.clock = clock;
     }
 
     /** 从握手属性取得用户身份并注册连接。 */
@@ -110,7 +114,7 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
             String body = objectMapper.createObjectNode()
                     .put("type", "error")
                     .put("message_id", java.util.UUID.randomUUID().toString())
-                    .put("timestamp", java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).toString())
+                    .put("timestamp", OffsetDateTime.now(clock).toString())
                     .set("payload", objectMapper.createObjectNode().put("message", message))
                     .toString();
             session.sendMessage(new TextMessage(body));

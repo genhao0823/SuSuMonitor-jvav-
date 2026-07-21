@@ -4,6 +4,7 @@ import com.susumonitor.server.common.BusinessException;
 import com.susumonitor.server.common.ErrorCode;
 import com.susumonitor.server.security.AuthenticatedUser;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -11,6 +12,7 @@ import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -25,15 +27,19 @@ public class MonitorTicketService {
     private final SecureRandom secureRandom = new SecureRandom();
     private final ConcurrentMap<String, TicketEntry> tickets = new ConcurrentHashMap<>();
     private final Duration ticketTtl;
+    private final Clock clock;
 
-    /** 默认构造，Spring 组件扫描使用，ticket 有效期 30 秒。 */
-    public MonitorTicketService() {
-        this(DEFAULT_TICKET_TTL);
+    /** Spring 组件扫描使用统一 UTC Clock，ticket 有效期 30 秒。 */
+    // 多构造器场景下明确指定生产注入入口，避免 Spring 尝试寻找无参构造器。
+    @Autowired
+    public MonitorTicketService(Clock clock) {
+        this(DEFAULT_TICKET_TTL, clock);
     }
 
-    /** 包私有构造，允许测试注入短 TTL 以验证过期清理逻辑。 */
-    MonitorTicketService(Duration ticketTtl) {
+    /** 包私有构造，允许测试注入 TTL 和可控 Clock。 */
+    MonitorTicketService(Duration ticketTtl, Clock clock) {
         this.ticketTtl = ticketTtl;
+        this.clock = clock;
     }
 
     /** 为已认证用户签发一次性 ticket。 */
@@ -41,7 +47,7 @@ public class MonitorTicketService {
         byte[] bytes = new byte[TICKET_BYTES];
         secureRandom.nextBytes(bytes);
         String ticket = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        Instant expiresAt = Instant.now().plus(ticketTtl);
+        Instant expiresAt = Instant.now(clock).plus(ticketTtl);
         tickets.put(ticket, new TicketEntry(user, expiresAt));
         return new MonitorTicketVo(ticket, expiresAt.atOffset(ZoneOffset.UTC));
     }
@@ -52,7 +58,7 @@ public class MonitorTicketService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
         TicketEntry entry = tickets.remove(ticket);
-        if (entry == null || entry.expiresAt().isBefore(Instant.now())) {
+        if (entry == null || !entry.expiresAt().isAfter(Instant.now(clock))) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
         return entry.user();
@@ -61,8 +67,8 @@ public class MonitorTicketService {
     /** 每分钟清理已过期但从未被消费的 ticket，防止内存无界累积。 */
     @Scheduled(fixedDelay = 60_000)
     public void purgeExpiredTickets() {
-        Instant now = Instant.now();
-        tickets.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(now));
+        Instant now = Instant.now(clock);
+        tickets.entrySet().removeIf(entry -> !entry.getValue().expiresAt().isAfter(now));
     }
 
     private record TicketEntry(AuthenticatedUser user, Instant expiresAt) {

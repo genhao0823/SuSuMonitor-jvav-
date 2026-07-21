@@ -13,6 +13,8 @@ import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
 import com.susumonitor.server.module.metrics.service.MetricsService;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -123,6 +125,12 @@ class MonitorMetricsPublisherIntegrationTests {
         @Bean
         ObjectMapper objectMapper() {
             return new ObjectMapper().findAndRegisterModules();
+        }
+
+        /** 固定广播时间源，避免测试依赖系统时间。 */
+        @Bean
+        Clock clock() {
+            return Clock.fixed(Instant.parse("2026-07-22T00:00:00Z"), ZoneOffset.UTC);
         }
 
         /** 提供 Metrics Mapper 替身，避免执行 SQL。 */
