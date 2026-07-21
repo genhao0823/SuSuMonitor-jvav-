@@ -51,6 +51,11 @@ local.properties
 app/build/
 captures/
 
+# Go
+agent-go-SuMon/bin/
+agent-go-SuMon/vendor/
+agent-go-SuMon/config/agent.yml
+
 # Docker/k8s local artifacts
 *.tar
 *.tgz
