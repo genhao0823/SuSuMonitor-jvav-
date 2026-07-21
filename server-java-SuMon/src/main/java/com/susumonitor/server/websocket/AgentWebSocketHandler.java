@@ -7,9 +7,11 @@ import com.susumonitor.server.module.server.entity.ServerEntity;
 import com.susumonitor.server.module.metrics.dto.MetricReportMessage;
 import com.susumonitor.server.module.metrics.service.MetricsService;
 import java.io.IOException;
-import java.time.LocalDateTime;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
     private final AgentHeartbeatService heartbeatService;
     private final AgentConnectionRegistry connectionRegistry;
     private final MetricsService metricsService;
+    private final Clock clock;
     private final Map<String, AgentWebSocketSession> pendingSessions = new ConcurrentHashMap<>();
 
     /** 注入 JSON、鉴权、心跳和连接注册依赖。 */
@@ -41,18 +44,20 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
             AgentAuthenticationService authenticationService,
             AgentHeartbeatService heartbeatService,
             AgentConnectionRegistry connectionRegistry,
-            MetricsService metricsService) {
+            MetricsService metricsService,
+            Clock clock) {
         this.objectMapper = objectMapper;
         this.authenticationService = authenticationService;
         this.heartbeatService = heartbeatService;
         this.connectionRegistry = connectionRegistry;
         this.metricsService = metricsService;
+        this.clock = clock;
     }
 
     /** 保存新连接，等待其发送首帧认证。 */
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        pendingSessions.put(session.getId(), new AgentWebSocketSession(session));
+        pendingSessions.put(session.getId(), new AgentWebSocketSession(session, clock));
     }
 
     /** 解析并分发 Agent 消息。 */
@@ -117,7 +122,7 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
         session.markAuthenticating();
         Long serverId = payload.get("server_id").longValue();
         ServerEntity server = authenticationService.authenticate(serverId, payload.get("token").textValue());
-        session.authenticate(server.getId(), LocalDateTime.now(java.time.ZoneOffset.UTC));
+        session.authenticate(server.getId(), LocalDateTime.now(clock));
         heartbeatService.heartbeat(session);
         // 注册前校验连接仍在，避免把已关闭会话注册进 registry。
         if (session.socketSession().isOpen()) {
@@ -129,7 +134,7 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
     /** 清理十秒内未发送认证首帧的连接，跳过认证中状态避免误杀慢 DB 认证。 */
     @Scheduled(fixedDelay = 5_000)
     public void closeUnauthenticatedSessions() {
-        Instant cutoff = Instant.now().minus(Duration.ofSeconds(10));
+        Instant cutoff = Instant.now(clock).minus(Duration.ofSeconds(10));
         pendingSessions.values().removeIf(session -> {
             if (session.authenticated() || session.authenticating() || session.connectedAt().isAfter(cutoff)) {
                 return false;
@@ -145,7 +150,7 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
             String body = objectMapper.createObjectNode()
                     .put("type", type.value())
                     .put("message_id", messageId)
-                    .put("timestamp", java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).toString())
+                    .put("timestamp", OffsetDateTime.now(clock).toString())
                     .set("payload", payload).toString();
             session.sendMessage(new TextMessage(body));
         }

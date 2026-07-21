@@ -1,7 +1,8 @@
 package com.susumonitor.server.websocket;
 
-import java.time.LocalDateTime;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import org.springframework.web.socket.WebSocketSession;
 
 /**
@@ -19,10 +20,10 @@ public final class AgentWebSocketSession {
     private boolean authenticated;
 
     /** 创建未认证的 WebSocket 会话包装。 */
-    public AgentWebSocketSession(WebSocketSession socketSession) {
+    public AgentWebSocketSession(WebSocketSession socketSession, Clock clock) {
         this.socketSession = socketSession;
         this.sessionId = socketSession.getId();
-        this.connectedAt = Instant.now();
+        this.connectedAt = Instant.now(clock);
     }
 
     public WebSocketSession socketSession() {
