@@ -1,18 +1,21 @@
 // Package main 是 SuSuMonitor Agent 的启动入口。
 //
-// 阶段 0 只加载配置并打印启动信息，不做 WebSocket 连接和指标采集。
-// 后续阶段逐步接入 wsclient、collector 和 reporter。
+// 阶段 2：加载配置并启动 WebSocket 客户端，实现连接、鉴权、心跳和重连。
+// 指标采集和上报在阶段 3-4 接入。
 package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"agent-go-SuMon/internal/config"
+	"agent-go-SuMon/internal/wsclient"
 )
 
 func main() {
@@ -31,13 +34,24 @@ func main() {
 		"heartbeat_interval", cfg.HeartbeatIntervalSeconds,
 	)
 
-	// 阶段 0：等待退出信号；后续阶段在此启动 wsclient、collector 和 reporter。
+	client := wsclient.NewClient(
+		cfg.BackendURL,
+		cfg.ServerID,
+		cfg.AgentToken,
+		logger,
+		time.Duration(cfg.HeartbeatIntervalSeconds)*time.Second,
+		time.Duration(cfg.ReconnectInitialSeconds)*time.Second,
+		time.Duration(cfg.ReconnectMaxSeconds)*time.Second,
+	)
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	logger.Info("agent running, waiting for signal to exit (阶段 0 骨架)")
-	<-ctx.Done()
-	logger.Info("agent shutting down")
+	if err := client.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		logger.Error("agent exited with error", "error", err)
+		os.Exit(1)
+	}
+	logger.Info("agent shutdown complete")
 }
 
 // newLogger 创建结构化日志器，输出 JSON 到 stdout。
