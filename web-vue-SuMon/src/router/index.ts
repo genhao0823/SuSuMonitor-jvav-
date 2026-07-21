@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { installRouterGuards } from './guards'
+import { installRouterLoading } from '@/composables/useRouterLoading'
 import MainLayout from '@/layouts/MainLayout.vue'
 
 declare module 'vue-router' {
@@ -89,5 +90,6 @@ const router = createRouter({
 })
 
 installRouterGuards(router)
+installRouterLoading(router)
 
 export default router
