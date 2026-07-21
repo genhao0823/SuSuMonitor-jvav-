@@ -66,3 +66,38 @@ OpenAPI 契约结构校验
 - **不校验路径格式**:路径风格是 OpenAPI 设计问题,不在 lint 范围
 - **不校验跨文件一致性**:三份 JSON 分属不同模块,跨文件校验通过 Apifox import 验证
 - **不校验中文/特殊字符**:OpenAPI 3 允许 Unicode
+
+---
+
+## pre-commit 钩子
+
+`web-vue-SuMon/.husky/pre-commit` 会在每次 `git commit` 前自动跑 `npm run openapi:check`。
+校验失败时 git 拒绝本次 commit。
+
+### 钩子配置
+
+- `core.hooksPath = web-vue-SuMon/.husky`（仓库根相对路径）
+- 钩子脚本会 `cd` 到 `web-vue-SuMon/` 后跑校验
+- 钩子的退出码透传给 git:非 0 时 commit 被中止
+
+### 绕过钩子
+
+紧急情况可用 `git commit --no-verify -m "..."` 跳过钩子,**不推荐**。
+
+### 团队成员上手
+
+**当前实现**：钩子通过手动 `git config core.hooksPath` 配置,不依赖 husky 包。
+若在新机器上 clone 仓库,需要在仓库根跑一次:
+
+```bash
+git config core.hooksPath web-vue-SuMon/.husky
+```
+
+后续如果引入 husky 包(团队扩大、CI 多端),可加 `"prepare": "husky"` script 到 package.json 实现自动配置。
+但当前不需要 husky 作为 devDep,手动 git config 即可。
+
+### 关于 husky 包
+
+我最初尝试用 husky 9.1.7 实现,遇到 Windows + 父子目录 `.git` 的兼容问题
+(husky 在 web-vue-SuMon/ 跑找不到父级 .git)。
+**当前方案放弃 husky,改为手写 shim**,更可控、更轻量、零依赖。
