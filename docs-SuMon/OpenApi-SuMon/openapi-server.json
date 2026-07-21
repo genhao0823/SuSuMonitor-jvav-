@@ -387,7 +387,7 @@
       "post": {
         "tags": ["servers"],
         "summary": "Issue Monitor WebSocket ticket",
-        "description": "Issues a one-time 30-second ticket for /ws/monitor. A long-lived JWT and Agent Token are never placed in the WebSocket URL.",
+        "description": "Issues a one-time ticket for /ws/monitor. The ticket expires exactly at expires_at, 30 seconds after issue. A long-lived JWT and Agent Token are never placed in the WebSocket URL.",
         "operationId": "issueMonitorTicket",
         "security": [{"bearerAuth": []}],
         "parameters": [{"$ref": "#/components/parameters/XCorrelationId"}],

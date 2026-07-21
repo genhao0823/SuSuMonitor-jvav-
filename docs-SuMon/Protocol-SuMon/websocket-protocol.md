@@ -78,7 +78,7 @@ The broadcast never contains Agent Token, Token hash, SSH credentials, database 
 
 ## Security and Lifecycle
 
-- Monitor ticket lifetime is 30 seconds and each ticket is consumed once.
+- Monitor ticket lifetime is 30 seconds, expires exactly at `expires_at`, and each ticket is consumed once.
 - Ticket state is single-JVM memory only; Redis and distributed session state are not implemented.
 - Metrics broadcast runs after the database transaction commits.
 - Disconnect removes all subscriptions.
@@ -96,5 +96,7 @@ Flyway V1-V9           all success=1
 ```
 
 The Agent validation covered authentication, heartbeat, Metrics persistence, latest/history queries and old Token rejection after rotation. The Monitor validation covered approved-user Ticket issue, subscribe, post-commit `metrics.update`, unsubscribe and single-use Ticket rejection.
+
+Automated boundary tests additionally verify that a successful transaction sends one `metrics.update`, a rolled-back transaction sends none, a Ticket is usable at 29.999 seconds but rejected at 30 seconds, and two concurrent Ticket consumers produce at most one success.
 
 The first version does not provide cross-JVM connection state, Ticket sharing, subscription routing or broadcast fan-out. These require an external state and messaging layer before multi-instance deployment.

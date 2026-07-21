@@ -53,4 +53,12 @@
 
 ## 下一阶段
 
-下一阶段代码细节、技术栈、成功标准和隔离资源删除流程已整理到 `20260721-Agent-Monitor实时链路执行.md` 的“下一步计划”章节。本阶段不提前实现多 JVM 分布式状态。
+原下一阶段的 AFTER_COMMIT 回滚测试、Agent Clock 和 Monitor Clock 已于 2026-07-22 完成：
+
+| Commit | 模块 |
+| --- | --- |
+| `4c78ef2` | H2 AFTER_COMMIT 提交/回滚集成测试 |
+| `f623b07` | Agent 10 秒认证与 90 秒离线 Clock 可控化 |
+| `974cc1d` | Monitor Ticket、错误帧与广播 Clock 可控化 |
+
+本轮常规后端回归已提升为 162/162 通过。多 JVM 分布式状态仍未实现，只有明确进入多实例部署时才评估 Redis Ticket、订阅路由和跨实例广播。

@@ -10,13 +10,16 @@
 - Agent、Monitor、用户和 Metrics 时间转换统一采用 UTC。
 - 前端先通过 HTTP 获取 Monitor Ticket，再使用 Ticket 建立 `/ws/monitor` 连接。
 - OpenAPI、HTTP 样例、WebSocket 协议和项目需求地址已同步。
+- Metrics AFTER_COMMIT 已补充 H2 真实事务管理器集成测试，覆盖提交广播和回滚不广播。
+- Agent 和 Monitor 时间边界已统一注入 UTC `Clock`，10 秒认证、90 秒离线和 30 秒 Ticket 均可无等待测试。
 
 ## 代码验证
 
 | 验证对象 | 命令 | 实际结果 |
 | --- | --- | --- |
 | 后端编译 | `mvn -DskipTests compile` | 通过 |
-| 后端定向测试 | `mvn -Dtest=AgentTokenServiceTests,MonitorTicketServiceTests,MonitorSubscriptionRegistryTests,MetricsCleanupServiceTests,MetricsCleanupSchedulerTests,AppPropertiesTests test` | 18/18 通过 |
+| 后端定向测试 | `mvn -Dtest=MonitorMetricsPublisherIntegrationTests,AgentWebSocketHandlerTests,AgentHeartbeatServiceTests,MonitorTicketServiceTests test` | 9/9 通过 |
+| 后端常规回归 | `mvn -Dtest=!MetricsCleanupMySqlValidationTests test` | 162/162 通过 |
 | 前端 lint/typecheck/build | `npm run lint; npm run typecheck; npm run build` | 三项通过 |
 | OpenAPI JSON | Node JSON.parse 与路径检查 | 通过，6 个新增路径存在 |
 | 差异检查 | `git diff --check` | 通过 |
@@ -34,33 +37,31 @@
 
 ## 未验证与边界
 
-- 排除需要显式隔离 MySQL 凭据的 `MetricsCleanupMySqlValidationTests` 后，常规回归共 155 个测试，0 失败、0 错误。该 MySQL 清理测试已有历史隔离库验收记录，本轮未对保留库重复执行破坏性清理。
-- `metrics.update` 的 AFTER_COMMIT 顺序已通过真实落库后广播间接验证；事务回滚不广播仍需专门集成测试。
+- 排除需要显式隔离 MySQL 凭据的 `MetricsCleanupMySqlValidationTests` 后，常规回归共 162 个测试，0 失败、0 错误。该 MySQL 清理测试已有历史隔离库验收记录，本轮未对保留库重复执行破坏性清理。
+- `metrics.update` 已通过 H2 `DataSourceTransactionManager` 集成测试直接验证：提交发送一次，显式回滚发送零次；该测试不覆盖 MySQL SQL 方言。
 - 第一版只支持单 JVM，未验证多实例连接、Ticket 和订阅状态共享。
 - 隔离数据库继续保留，未执行删除；删除需用户确认并先完成可读取的备份。
 
 ## 下一步计划
 
-### 1. AFTER_COMMIT 负路径集成测试
+### 1. AFTER_COMMIT 负路径集成测试（已完成）
 
-- 技术栈：Spring Boot Test、JUnit 5、`@TransactionalEventListener`、Mockito、真实或 Testcontainers MySQL。
-- 代码位置：新增 `MonitorMetricsPublisherIntegrationTests`，测试 `MetricsService.report()` 成功提交后调用 publisher；由测试事务显式回滚时不得调用 publisher。
-- 实现细节：用可观察的 `WebSocketSession` mock 注册订阅；提交场景断言收到一次 `metrics.update`，回滚场景断言 0 次发送。
-- 成功标准：提交和回滚两个测试均通过，且真实数据库无残留测试数据。
+- 技术栈：Spring Test、JUnit 5、H2、`DataSourceTransactionManager`、Mockito。
+- 实际结果：提交和回滚 2/2 通过；H2 只驱动真实事务同步，Mapper 不执行 SQL，因此无数据库测试数据残留。
 
-### 2. Agent 时间边界可控化
+### 2. Agent 时间边界可控化（已完成）
 
 - 技术栈：Java `Clock`、Spring Bean 注入、JUnit 5、Mockito。
 - 代码位置：`AgentWebSocketSession`、`AgentWebSocketHandler`、`AgentHeartbeatService`。
 - 实现细节：以 `Clock` 替代散落的 `Instant.now()` 和 `LocalDateTime.now(UTC)`；测试固定推进 10 秒认证超时和 90 秒离线阈值，不执行真实等待。
-- 成功标准：边界前连接保留、边界后连接关闭；认证中连接不被误杀；超时 Agent 被标记 offline。
+- 实际结果：9 秒保留、11 秒关闭；认证中慢连接不被误杀；89 秒保持在线、91 秒标记离线并关闭连接。
 
-### 3. Monitor Ticket 时间可控化
+### 3. Monitor Ticket 时间可控化（已完成）
 
 - 技术栈：Java `Clock`、Spring 定时任务、JUnit 5。
 - 代码位置：`MonitorTicketService`、`MonitorTicketServiceTests`。
 - 实现细节：默认注入 UTC system Clock；测试注入 fixed/mutable Clock，直接推进到 30 秒前后，移除当前 `Thread.sleep`。
-- 成功标准：29.999 秒可消费、30 秒后拒绝、清理任务移除未消费过期 Ticket、并发消费最多成功一次。
+- 实际结果：29.999 秒可消费、到达 30 秒时拒绝、清理任务移除未消费过期 Ticket、并发消费最多成功一次；测试已移除 `Thread.sleep`。
 
 ### 4. 多 JVM 演进评估
 
