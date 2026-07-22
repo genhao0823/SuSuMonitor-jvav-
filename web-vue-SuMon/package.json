@@ -12,7 +12,8 @@
     "lint": "eslint . --ext .ts,.vue --max-warnings 0",
     "lint:fix": "eslint . --ext .ts,.vue --fix",
     "format": "prettier --write \"src/**/*.{ts,vue,css,md}\" \"*.{ts,js,json,md}\"",
-    "openapi:check": "node scripts/check-openapi.mjs"
+    "openapi:check": "node scripts/check-openapi.mjs",
+    "audit:catchup": "node scripts/audit-catchup.mjs"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.0",
