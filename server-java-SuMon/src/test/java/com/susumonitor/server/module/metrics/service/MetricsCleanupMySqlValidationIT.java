@@ -6,8 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContextInitializer;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,9 +22,36 @@ import com.susumonitor.server.config.AppProperties;
  */
 @ActiveProfiles("metrics-validation")
 @SpringBootTest
-class MetricsCleanupMySqlValidationTests {
+@ContextConfiguration(initializers = MetricsCleanupMySqlValidationIT.TargetDatabaseGuard.class)
+@EnabledIfEnvironmentVariable(named = "RUN_MYSQL_VALIDATION_TESTS", matches = "true")
+class MetricsCleanupMySqlValidationIT {
 
     private static final long VALIDATION_SERVER_ID = 900001L;
+
+    /**
+     * 阻止真实 MySQL 验收误连开发库；只有显式启用且目标为本机隔离库时才允许加载测试上下文。
+     */
+    private static void validateTargetDatabase() {
+        String host = System.getenv("DB_HOST");
+        String database = System.getenv("DB_NAME");
+        if (!("127.0.0.1".equals(host) || "localhost".equalsIgnoreCase(host))) {
+            throw new IllegalStateException("MySQL validation requires a local DB_HOST");
+        }
+        if (database == null || database.isBlank()
+                || "susumonitor".equalsIgnoreCase(database)
+                || !database.toLowerCase().contains("validation")) {
+            throw new IllegalStateException("MySQL validation requires an isolated validation DB_NAME");
+        }
+    }
+
+    /** 在 Spring 创建数据源之前校验真实 MySQL 验收目标，避免不安全配置触发数据库连接。 */
+    static final class TargetDatabaseGuard implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+
+        @Override
+        public void initialize(ConfigurableApplicationContext applicationContext) {
+            validateTargetDatabase();
+        }
+    }
 
     @Autowired
     private MetricsCleanupService cleanupService;
