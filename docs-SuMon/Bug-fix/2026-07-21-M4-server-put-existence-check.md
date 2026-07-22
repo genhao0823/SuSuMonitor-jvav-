@@ -132,7 +132,7 @@ async function reload(): Promise<void> {
 - 编译：`mvn -DskipTests compile`，通过
 - OpenAPI：`npm run openapi:check`，3/3 通过
 - 服务健康检查：`/api/health` 和 `/api/ready` 均 HTTP 200
-- 真实 HTTP 更新验证：待使用安全注入的管理员 JWT 验证
+- 真实 HTTP 更新验证：已通过 Apifox 授权调用，但当前 18080 运行进程返回 `40002`，待重启加载最新代码后复验
 - Apifox CLI 已调用本地接口，但用例未注入有效 `adminToken`，实际响应为 `40100`，不能作为 B2 的 `40400` 验收证据
 - Apifox 命令：`apifox test-case run 395661082 --project 8585366 --environment 47408671`
 - Apifox 结果：HTTP 401、业务码 `40100`
@@ -145,6 +145,6 @@ async function reload(): Promise<void> {
 - [x] MockMvc: 不存在 ID + 不完整 body 返回 `40400`
 - [x] MockMvc: 有效服务器 body 缺字段返回 `40002`
 - [x] MockMvc: 有效服务器 body 合法时仍调用更新 Service
-- [ ] 真实 HTTP: `PUT /api/servers/99999` 返回 `40400`
+- [ ] 真实 HTTP: `PUT /api/servers/99999` 返回 `40400`（当前运行实例仍返回 `40002`）
 - [ ] 真实 HTTP: 合法服务器更新成功
 - [ ] 集成测试:连续两次 PUT 同一个 ID,第二次应 404(第一次成功后被软删除的场景)

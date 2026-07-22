@@ -103,3 +103,107 @@ Content-Type: application/json
 1. 使用隔离服务和安全注入的管理员 JWT 完成真实 HTTP 无写入验证。
 2. 真实 HTTP 通过后更新 Bug 验收勾选项。
 3. 进入 B2-R，复核排序、SSH 错误码和软删除三个遗留问题。
+
+## 九、Apifox CLI 接口测试记录
+
+### 测试范围
+
+- Apifox 项目：`8585366`
+- 分支：`main`
+- 本地环境：`47408671`，`http://localhost:18080`
+- 当前项目接口数：17
+- 当前项目已有测试用例数：11
+- 管理员 JWT 仅通过本次 CLI 运行时全局变量注入，未写入 Apifox 云变量、仓库或日志。
+
+执行方式：
+
+```powershell
+apifox test-case run <caseId> --project 8585366 --environment 47408671 --global-var "adminToken=<runtime-only>" --on-error continue
+```
+
+### 已通过用例
+
+7 个用例通过：
+
+- SSH test 无 Token：40100
+- SSH host-key 无 Token：40100
+- SSH host-key 非法指纹：40002
+- SSH host-key 缺少请求体：40002
+- SSH host-key 非法服务器 ID：40002
+- SSH test 不存在服务器：40400
+- SSH test 拒绝请求体：40002
+
+### 未通过用例
+
+4 个用例未通过：
+
+- 普通用户 host-key 预期 40300，实际 40100
+- host-key 禁止 CIDR 预期 40301，实际 40400
+- 普通用户 SSH test 预期 40300，实际 40100
+- host-key 禁止端口预期 40301，实际 40400
+
+其中普通用户用例使用的 Token 与当前管理员运行变量不匹配，不能据此判定权限逻辑失败；禁止 CIDR/端口用例实际先命中服务器不存在或数据状态不满足前置条件，不能据此判定 SSH 出站策略失败。
+
+### 未覆盖接口
+
+当前 Apifox 项目没有测试用例覆盖：
+
+- `GET /api/health`
+- `GET /api/ready`
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- `POST /api/auth/logout`
+- `GET /api/admin/users/pending`
+- `PUT /api/admin/users/{id}/approve`
+- `PUT /api/admin/users/{id}/reject`
+- `GET /api/servers`
+- `POST /api/servers`
+- `GET /api/servers/{id}`
+- `PUT /api/servers/{id}`
+- `DELETE /api/servers/{id}`
+- `GET /api/servers/{id}/status`
+
+注意：接口列表显示 17 个接口，但其中现有测试用例只覆盖 SSH 相关接口；本次没有宣称上述接口已通过 Apifox 验收。
+
+### B2 PUT 目标接口
+
+本次使用 Apifox CLI 在 `main` 分支创建了临时用例，目标为：
+
+```http
+PUT /api/servers/99999
+{"description":"b2-probe"}
+```
+
+用例创建 ID：`396683648`。Schema 校验通过，使用运行时管理员 JWT 执行后结果为：
+
+```text
+HTTP 400
+business code 40002
+```
+
+目标断言 `HTTP 404`、`business code 40400` 未通过。该结果与直接 HTTP 验证一致，说明当前 `18080` 运行进程仍加载 B2 修复前代码；Apifox 鉴权已成功，不是 `40100`。
+
+测试完成后已删除临时 Apifox 用例 `396683648`，并删除本地临时 JSON 文件。删除前备份：
+
+```text
+C:\Backup\SuSuMonitor\execution-20260723\apifox-b2-case-cleanup-20260722-182534\
+```
+
+本次运行时 Token 未写入 Apifox 持久化变量、仓库或日志。
+
+### 结论
+
+本次 Apifox CLI 真实请求已完成，但结论为：
+
+```text
+已有 11 个用例：7 个通过，4 个未通过
+17 个接口：未全部覆盖
+B2 PUT：Apifox 已授权执行，但当前运行进程返回 `40002`，真实验收未通过
+```
+
+备份：
+
+```text
+C:\Backup\SuSuMonitor\execution-20260723\apifox-api-test-20260722-182303\
+```
