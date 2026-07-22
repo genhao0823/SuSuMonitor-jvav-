@@ -139,8 +139,8 @@ J2 自动化验证结果：
 | Service | 默认值、非法方向、六字段双方向透传 | 通过，40 项 Service 测试整体通过 |
 | Java 编译 | `mvn -DskipTests compile` | 通过 |
 | Java 常规回归 | `mvn test` | 188/188 通过 |
-| 真实 MySQL Mapper | `ServerMapperMySqlValidationIT` | 未执行，缺少运行时隔离库凭据 |
-| 真实 HTTP/Apifox | 当前版本排序矩阵 | 未执行，未将 Mock 测试替代真实验收 |
+| 真实 MySQL Mapper | `ServerMapperMySqlValidationIT` | 通过，3/3 |
+| 真实 HTTP/Apifox | 当前版本排序矩阵 | HTTP 前置阻塞，未完成排序请求 |
 
 真实 MySQL 集成测试入口已创建：
 
@@ -148,10 +148,30 @@ J2 自动化验证结果：
 mvn -Pmysql-validation "-Dit.test=ServerMapperMySqlValidationIT" verify
 ```
 
-该测试只允许连接本机且数据库名包含 `validation` 的隔离库，并覆盖六个排序字段、升降序、排序后分页、关键词组合和软删除排除。提供隔离凭据后才能将真实 SQL 状态更新为通过。
+该测试只允许连接本机且数据库名包含 `validation` 的隔离库，并覆盖六个排序字段、升降序、排序后分页、关键词组合和软删除排除。J2 已在 `susumonitor_server_sort_validation_20260723` 上通过。
+
+真实 MySQL 运行结果：
+
+```text
+Flyway V1-V9：通过
+MetricsCleanupMySqlValidationIT：2/2 通过
+ServerMapperMySqlValidationIT：3/3 通过
+```
+
+真实 HTTP 前置结果：
+
+```text
+18080 /api/health：HTTP 200
+18080 /api/ready：HTTP 200
+POST /api/auth/login：admin / 运行时提供密码返回 HTTP 400、业务码 40001
+```
+
+由于当前运行实例无法使用该管理员凭据登录，未在开发库创建或修改测试服务器，也未将 HTTP 未执行误记为排序通过。隔离库当前保留 1 个用户、0 台服务器。
 
 J2 独立提交：
 
 ```text
-待提交：test(server): 验证服务器列表排序行为
+已提交：`4d95c5e test(server): 验证服务器列表排序行为`
+
+真实 MySQL 验收记录将在本轮追加的 Java 后端执行日志中留痕；真实 HTTP/Apifox 仍待取得当前实例可用的管理员登录前置后再执行。
 ```
