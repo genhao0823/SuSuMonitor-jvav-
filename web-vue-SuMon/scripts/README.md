@@ -183,3 +183,57 @@ Catch-up 静态审计
 - **不做完整 OpenAPI schema 字段交叉比对**(需要解析 properties 树,Module 2 视需求决定是否补)
 - **不做 TS 类型推导对比**(需要解析 d.ts,留给 eslint-plugin-typescript)
 - **不扫 .vue `<script>` 外的模板**(避免 false positive)
+
+---
+
+## api-e2e-test.mjs
+
+HTTP API 自动化测试脚本。**在 catch-up 大批 commit 后跑一次**,
+用 axios 直接调后端接口检测 4xx/5xx 错误、字段名不一致、未授权访问等
+纯 HTTP 层 bug(不需要浏览器)。
+
+### 用法
+
+```bash
+node scripts/api-e2e-test.mjs
+# 或
+npm run api:e2e
+```
+
+向 `http://127.0.0.1:18080` 发起请求,覆盖 17 用户路径中的 HTTP 部分:
+
+| 路径 | 检查 |
+|---|---|
+| `/api/health` `/api/ready` | 后端活性 |
+| `/api/auth/me` (无 token) | HTTP 401 + body 40100 |
+| `/api/auth/register` | 注册新账号(pending 状态)|
+| `/api/auth/login` (pending) | HTTP 403 + body 40300(预期)|
+| `/api/auth/logout` | 40100 / 200 |
+| `/api/servers` (无 token) | HTTP 401 + body 40100 |
+| `/api/servers/{id}` | 200 + 字段名是 snake_case(ssh_host 等) |
+| `/api/servers/{id}/status` | 200 |
+| `/api/servers/{id}/metrics/latest` | 200 或 40400(无 agent)|
+| `/api/servers/{id}/metrics` | 200 或 40400(无 agent)|
+| `/api/admin/users/pending` (无 admin) | 40100 / 40300 |
+
+### 不测的部分(需浏览器或 admin 凭据)
+
+- UI 渲染(数字滚动、签名引言、玻璃卡视觉)
+- 复杂交互(下拉、二次确认、模态框)
+- M5 admin 操作 approve/reject(需要 admin 凭据)
+
+### 设计原则
+
+- 零依赖:仅用 Node 内置 `fetch`(Node 18+)
+- 自动注册新 pending 账号(用 timestamp 后缀避免冲突)
+- 输出对齐 `openapi:check` / `audit:catchup` 风格(✓/✗/⚠/退出码 0/1)
+- 纯只读:不修改后端任何数据
+
+### 与 audit:catchup 的关系
+
+| 工具 | 范围 | 检查内容 |
+|---|---|---|
+| `audit:catchup` | 静态扫描 src/ | 代码层 bug(魔法数字 / 参数名 / 硬编码) |
+| `api:e2e` | HTTP API 层 | 运行时 bug(4xx / 5xx / 字段命名 / 权限) |
+
+两套互补:`audit:catchup` 防代码层错,`api:e2e` 防接口层错。
