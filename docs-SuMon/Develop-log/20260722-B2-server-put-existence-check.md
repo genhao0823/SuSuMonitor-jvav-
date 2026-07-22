@@ -106,6 +106,10 @@ Content-Type: application/json
 
 ## 九、Apifox CLI 接口测试记录
 
+### 隔离测试管理员
+
+目标隔离库原本没有用户，且 `auth_bootstrap_state.admin_initialized=0`。通过最新后端的 `/api/auth/register` 首次注册 `admin`，应用自动创建已审核管理员；随后 `/api/auth/login` 成功签发临时 JWT。密码和 JWT 未写入日志、Apifox 持久化变量或 Git。
+
 ### 测试范围
 
 - Apifox 项目：`8585366`
@@ -175,16 +179,16 @@ PUT /api/servers/99999
 {"description":"b2-probe"}
 ```
 
-先前用例 `396683648` 已删除。本轮在重启后的最新服务上重新创建临时用例 `396684592`，Schema 校验通过；但执行时返回：
+先前临时用例已删除。本轮在重启后的最新服务上重新创建临时用例 `396686204`，Schema 校验通过，并使用隔离库首次注册的管理员账号登录后获取运行时 JWT 执行成功。
 
 ```text
-HTTP 401
-business code 40100
+HTTP 404
+business code 40400
 ```
 
-目标断言 `HTTP 404`、`business code 40400` 未通过。最新服务健康检查已通过，`40100` 表明本轮使用的聊天 Token 已过期，不能据此判断最新 B2 代码行为。
+目标断言全部通过，确认最新 `18080` 运行实例已加载 B2 修复代码。
 
-测试完成后已删除临时 Apifox 用例 `396684592`，并删除本地临时 JSON 文件。删除前备份：
+测试完成后已删除临时 Apifox 用例 `396686204`，并删除本地临时 JSON 文件。删除前备份：
 
 ```text
 C:\Backup\SuSuMonitor\execution-20260723\apifox-b2-case-cleanup-20260722-182534\
@@ -199,7 +203,7 @@ C:\Backup\SuSuMonitor\execution-20260723\apifox-b2-case-cleanup-20260722-182534\
 ```text
 已有 11 个用例：7 个通过，4 个未通过
 17 个接口：未全部覆盖
-B2 PUT：最新服务已启动，但测试 Token 已过期，真实验收仍待有效 Token
+B2 PUT：Apifox 授权验收通过，HTTP 404、业务码 40400、X-Request-ID 断言全部通过
 ```
 
 备份：
