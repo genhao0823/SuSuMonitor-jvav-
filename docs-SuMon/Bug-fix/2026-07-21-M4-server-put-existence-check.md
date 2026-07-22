@@ -133,6 +133,10 @@ async function reload(): Promise<void> {
 - OpenAPI：`npm run openapi:check`，3/3 通过
 - 服务健康检查：`/api/health` 和 `/api/ready` 均 HTTP 200
 - 真实 HTTP 更新验证：待使用安全注入的管理员 JWT 验证
+- Apifox CLI 已调用本地接口，但用例未注入有效 `adminToken`，实际响应为 `40100`，不能作为 B2 的 `40400` 验收证据
+- Apifox 命令：`apifox test-case run 395661082 --project 8585366 --environment 47408671`
+- Apifox 结果：HTTP 401、业务码 `40100`
+- Apifox 记录备份：`C:\Backup\SuSuMonitor\execution-20260723\b2-apifox-20260722-173346\`
 
 ## 验收标准
 

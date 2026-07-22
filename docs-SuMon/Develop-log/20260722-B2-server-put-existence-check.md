@@ -42,6 +42,31 @@ C:\Backup\SuSuMonitor\execution-20260723\b2-put-existence-20260722-170032\
 - 健康检查：`/api/health`、`/api/ready` 均 HTTP 200。
 - `git diff --check`：通过。
 
+## 五、Apifox 运行记录
+
+Apifox CLI 已登录并确认项目 `8585366`、本地环境 `47408671` 和更新接口 `489125515` 存在。项目现有用例未配置有效的管理员 Token 全局变量。
+
+执行：
+
+```powershell
+apifox test-case run 395661082 --project 8585366 --environment 47408671
+```
+
+该用例实际调用本地服务，但由于 `{{adminToken}}` 未注入有效 JWT，服务返回：
+
+```text
+HTTP 401
+business code 40100
+```
+
+Apifox 已完成真实请求，但该结果只能证明未授权请求被安全链拒绝，不能证明 B2 的不存在服务器 PUT 返回 `40400`。没有把密码、JWT 或 Token 写入 Apifox 项目、仓库或日志。
+
+Apifox 记录备份：
+
+```text
+C:\Backup\SuSuMonitor\execution-20260723\b2-apifox-20260722-173346\
+```
+
 自动化测试覆盖：
 
 - 不存在 ID + 不完整 body 返回 `40400`。
@@ -50,7 +75,7 @@ C:\Backup\SuSuMonitor\execution-20260723\b2-put-existence-20260722-170032\
 - `existsActive` 对有效和不存在服务器返回正确结果。
 - 不存在目标不调用更新 Service。
 
-## 五、真实 HTTP 边界
+## 六、真实 HTTP 边界
 
 本轮未执行需要管理员 JWT 的真实 PUT 请求，当前没有保存管理员 JWT。
 
@@ -67,13 +92,13 @@ Content-Type: application/json
 
 真实 HTTP 完成前，Bug 索引保持“代码已修复，真实 HTTP 待验证”。
 
-## 六、敏感信息与回滚
+## 七、敏感信息与回滚
 
 - 数据库密码、JWT、Agent Token、SSH 凭据未写入代码、日志或 Git。
 - 未执行数据库写入、删除或迁移。
 - 回滚使用 B2 备份目录中的对应文件，恢复后重新执行定向测试和 `git diff --check`。
 
-## 七、后续动作
+## 八、后续动作
 
 1. 使用隔离服务和安全注入的管理员 JWT 完成真实 HTTP 无写入验证。
 2. 真实 HTTP 通过后更新 Bug 验收勾选项。
