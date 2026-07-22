@@ -131,7 +131,7 @@
         >
           <template #default="{ row }">
             <router-link
-              :to="{ name: 'server-detail', params: { id: row.id } }"
+              :to="{ name: 'server-detail', params: { serverId: row.id } }"
               class="server-list-view__name-link"
             >
               {{ row.name }}
