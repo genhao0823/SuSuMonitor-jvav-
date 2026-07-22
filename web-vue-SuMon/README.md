@@ -148,6 +148,7 @@ npm run dev    # http://127.0.0.1:5173,自动代理 /api → :18080
 | OpenAPI 契约 lint 脚本 | ✅ | 自动化 |
 | catch-up 静态审计(audit:catchup,11 条规则 v0.2) | ✅ | 自动化 |
 | HTTP API 自动化测试(api:e2e) | ✅ | 自动化 |
+| UI E2E 浏览器自动化(ui:e2e,puppeteer-core) | ✅ | 自动化 |
 | pre-commit 钩子(跑 openapi:check) | ✅ | 自动化 |
 | 服务器列表 spark line | ⚠️ mock | 等待 metrics history 接口 |
 | 上次 SSH 测试结果卡 | ⚠️ 占位 | 等待 SSH test history 接口 |
@@ -165,6 +166,7 @@ npm run dev    # http://127.0.0.1:5173,自动代理 /api → :18080
 | `npm run openapi:check` | OpenAPI 契约 lint |
 | `npm run audit:catchup` | catch-up 静态审计(11 条规则,扫魔法数字 / 参数名 / API 路径 / 占位密码 / TS any / 残留日志) |
 | `npm run api:e2e` | HTTP API 自动化测试(覆盖 17 路径中的 HTTP 部分) |
+| `npm run ui:e2e` | UI E2E 浏览器自动化(puppeteer-core + 系统 Chrome,17 路径) |
 
 ### 目录结构(2026-07-21 更新)
 
