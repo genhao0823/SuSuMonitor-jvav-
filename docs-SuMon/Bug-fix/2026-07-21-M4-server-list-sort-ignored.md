@@ -140,7 +140,7 @@ J2 自动化验证结果：
 | Java 编译 | `mvn -DskipTests compile` | 通过 |
 | Java 常规回归 | `mvn test` | 188/188 通过 |
 | 真实 MySQL Mapper | `ServerMapperMySqlValidationIT` | 通过，3/3 |
-| 真实 HTTP/Apifox | 当前版本排序矩阵 | HTTP 前置阻塞，未完成排序请求 |
+| 真实 HTTP/Apifox | 当前版本排序矩阵 | 真实 HTTP 已通过；Apifox CLI 未执行 |
 
 真实 MySQL 集成测试入口已创建：
 
@@ -158,20 +158,34 @@ MetricsCleanupMySqlValidationIT：2/2 通过
 ServerMapperMySqlValidationIT：3/3 通过
 ```
 
-真实 HTTP 前置结果：
+真实 HTTP 结果：
 
 ```text
 18080 /api/health：HTTP 200
 18080 /api/ready：HTTP 200
-POST /api/auth/login：admin / 运行时提供密码返回 HTTP 400、业务码 40001
+POST /api/auth/login：admin / 运行时提供新凭据返回 HTTP 200、业务码 0
 ```
 
-由于当前运行实例无法使用该管理员凭据登录，未在开发库创建或修改测试服务器，也未将 HTTP 未执行误记为排序通过。隔离库当前保留 1 个用户、0 台服务器。
+本轮仅对现有 `18080` 执行只读登录和 GET 列表请求，未在开发库创建、修改或删除测试服务器。
+
+实际排序矩阵：
+
+| 请求 | HTTP | 业务码 | total | 返回 ID | `X-Request-ID` |
+|---|---:|---:|---:|---|---|
+| `id asc` | 200 | 0 | 2 | `1,3` | 存在 |
+| `id desc` | 200 | 0 | 2 | `3,1` | 存在 |
+| `name asc` | 200 | 0 | 2 | `1,3` | 存在 |
+| `name desc` | 200 | 0 | 2 | `3,1` | 存在 |
+| `host asc` | 200 | 0 | 2 | `1,3` | 存在 |
+| 非法 `sort_by` | 400 | `40002` | - | - | 存在 |
+| 非法 `sort_order` | 400 | `40002` | - | - | 存在 |
+
+当前 HTTP 实例只有 2 条有效服务器，因此 name/host 缺少更多独立样本；完整字段顺序由真实 MySQL IT 覆盖。Apifox CLI 排序用例本轮未执行，HTTP 结果不冒充 Apifox 结果。
 
 J2 独立提交：
 
 ```text
 已提交：`4d95c5e test(server): 验证服务器列表排序行为`
 
-真实 MySQL 验收记录将在本轮追加的 Java 后端执行日志中留痕；真实 HTTP/Apifox 仍待取得当前实例可用的管理员登录前置后再执行。
+真实 MySQL 和 HTTP 验收记录已在本轮追加的 Java 后端执行日志中留痕；Apifox CLI 排序用例仍未执行。
 ```
