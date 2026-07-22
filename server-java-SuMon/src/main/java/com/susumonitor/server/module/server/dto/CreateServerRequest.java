@@ -10,6 +10,9 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.ToString;
 
+/**
+ * 接收服务器创建参数，并通过字段约束完成基础格式校验。
+ */
 // 自动生成当前 DTO 的 getter、setter、toString、equals 和 hashCode 方法。
 @Data
 public class CreateServerRequest {
@@ -66,18 +69,24 @@ public class CreateServerRequest {
 
     // 将 Java 的 sshPassword 属性映射为接口 JSON 字段 ssh_password。
     @JsonProperty("ssh_password")
+    // 限制 SSH 密码长度，具体认证方式组合由 Service 校验。
+    @Size(max = 1024)
     // 防止 Lombok 生成的 toString 方法输出 SSH 密码。
     @ToString.Exclude
     private String sshPassword;
 
     // 将 Java 的 sshPrivateKey 属性映射为接口 JSON 字段 ssh_private_key。
     @JsonProperty("ssh_private_key")
+    // 限制 SSH 私钥长度，具体认证方式组合由 Service 校验。
+    @Size(max = 65535)
     // 防止 Lombok 生成的 toString 方法输出 SSH 私钥。
     @ToString.Exclude
     private String sshPrivateKey;
 
     // 将 Java 的 sshPrivateKeyPassphrase 属性映射为接口 JSON 字段 ssh_private_key_passphrase。
     @JsonProperty("ssh_private_key_passphrase")
+    // 限制 SSH 私钥口令长度，具体认证方式组合由 Service 校验。
+    @Size(max = 1024)
     // 防止 Lombok 生成的 toString 方法输出 SSH 私钥口令。
     @ToString.Exclude
     private String sshPrivateKeyPassphrase;

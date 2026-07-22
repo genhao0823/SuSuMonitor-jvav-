@@ -1,0 +1,88 @@
+package com.susumonitor.server.module.metrics.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
+import java.time.LocalDateTime;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
+import com.susumonitor.server.config.AppProperties;
+
+/**
+ * 在显式隔离 MySQL 配置下验证 Metrics 清理 cutoff 边界和真实 Mapper SQL。
+ */
+@ActiveProfiles("metrics-validation")
+@SpringBootTest
+class MetricsCleanupMySqlValidationTests {
+
+    private static final long VALIDATION_SERVER_ID = 900001L;
+
+    @Autowired
+    private MetricsCleanupService cleanupService;
+
+    @Autowired
+    private MetricsCleanupMapper cleanupMapper;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private AppProperties appProperties;
+
+    /** 验证早于 cutoff 的记录删除，等于和晚于 cutoff 的记录保留。 */
+    @Test
+    void cutoffBoundaryShouldDeleteOnlyEarlierRows() {
+        LocalDateTime cutoff = LocalDateTime.of(2026, 1, 1, 0, 0, 0);
+        transactionTemplate.executeWithoutResult(status -> {
+            jdbcTemplate.update("DELETE FROM metrics WHERE server_id = ?", VALIDATION_SERVER_ID);
+            jdbcTemplate.update("INSERT INTO metrics (server_id, collected_at) VALUES (?, ?), (?, ?), (?, ?)",
+                    VALIDATION_SERVER_ID, cutoff.minusSeconds(1),
+                    VALIDATION_SERVER_ID, cutoff,
+                    VALIDATION_SERVER_ID, cutoff.plusSeconds(1));
+        });
+
+        MetricsCleanupService.CleanupResult result = cleanupService.cleanupExpiredMetrics(cutoff).orElseThrow();
+
+        assertNotNull(result);
+        assertEquals(1, result.deletedRows());
+        assertEquals(2, jdbcTemplate.queryForObject(
+                "SELECT COUNT(id) FROM metrics WHERE server_id = ?", Long.class, VALIDATION_SERVER_ID));
+    }
+
+    /** 验证单轮最大批次数限制，以及后续轮次可以继续删除剩余过期数据。 */
+    @Test
+    void cleanupShouldHonorBatchSizeAndMaximumBatches() {
+        LocalDateTime cutoff = LocalDateTime.of(2026, 2, 1, 0, 0, 0);
+        transactionTemplate.executeWithoutResult(status -> {
+            jdbcTemplate.update("DELETE FROM metrics WHERE server_id = ?", VALIDATION_SERVER_ID);
+            for (int index = 1; index <= 5; index++) {
+                jdbcTemplate.update("INSERT INTO metrics (server_id, collected_at) VALUES (?, ?)",
+                        VALIDATION_SERVER_ID, cutoff.minusSeconds(index));
+            }
+        });
+
+        appProperties.getMetrics().setCleanupBatchSize(2);
+        appProperties.getMetrics().setCleanupMaxBatchesPerRun(2);
+
+        MetricsCleanupService.CleanupResult first = cleanupService.cleanupExpiredMetrics(cutoff).orElseThrow();
+
+        assertEquals(2, first.batchCount());
+        assertEquals(4, first.deletedRows());
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(id) FROM metrics WHERE server_id = ?", Long.class, VALIDATION_SERVER_ID));
+
+        MetricsCleanupService.CleanupResult second = cleanupService.cleanupExpiredMetrics(cutoff).orElseThrow();
+
+        assertEquals(1, second.deletedRows());
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(id) FROM metrics WHERE server_id = ?", Long.class, VALIDATION_SERVER_ID));
+    }
+}

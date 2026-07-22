@@ -1,11 +1,10 @@
 logging:
   level:
     com.susumonitor.server: DEBUG
+    com.susumonitor.server.module.auth.mapper: INFO
     org.springframework.security: INFO
     org.mybatis: INFO
 
 spring:
-  datasource:
-    password: 732682
   flyway:
     enabled: true

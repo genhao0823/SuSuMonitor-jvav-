@@ -14,6 +14,7 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 @RestController
 @RequestMapping("/api")
@@ -33,7 +34,7 @@ public class SystemController {
 
     @GetMapping("/health")
     public ApiResponse<HealthStatusVo> health() {
-        return ApiResponse.success(new HealthStatusVo("UP", applicationName, OffsetDateTime.now()));
+        return ApiResponse.success(new HealthStatusVo("UP", applicationName, OffsetDateTime.now(ZoneOffset.UTC)));
     }
 
     @GetMapping("/ready")
@@ -42,7 +43,7 @@ public class SystemController {
             if (!connection.isValid(DATABASE_VALIDATE_TIMEOUT_SECONDS)) {
                 throw new BusinessException(ErrorCode.DATABASE_ERROR);
             }
-            return ApiResponse.success(new ReadyStatusVo("UP", "ok", OffsetDateTime.now()));
+            return ApiResponse.success(new ReadyStatusVo("UP", "ok", OffsetDateTime.now(ZoneOffset.UTC)));
         } catch (SQLException exception) {
             throw new BusinessException(ErrorCode.DATABASE_ERROR, exception);
         }
