@@ -211,3 +211,35 @@ B2 PUT：Apifox 授权验收通过，HTTP 404、业务码 40400、X-Request-ID �
 ```text
 C:\Backup\SuSuMonitor\execution-20260723\apifox-api-test-20260722-182303\
 ```
+
+## 十、B2-R SSH 前置条件复核
+
+为重跑原先 4 个前置条件不匹配的用例，在隔离库中通过应用接口准备了测试数据：
+
+- 普通用户：`apifox_user_20260722`，已审核为 `approved`，密码仅运行时注入。
+- CIDR 测试服务器：ID `1`，`ssh_host=127.0.0.1`、端口 `22`。
+- 端口测试服务器：ID `3`，`ssh_host=127.0.0.3`、端口 `2222`。
+- 数据库：`susumonitor_metrics_cleanup_validation_20260721`。
+
+服务器和用户均通过应用 REST 接口创建/审核，未直接写入业务表；测试数据保留在隔离库，未操作开发库。
+
+修正并更新了 4 个 Apifox 用例，确保路径、实际服务器 ID、Token 类型和断言数组正确：
+
+| 用例 | Apifox ID | 结果 |
+|---|---:|---|
+| approved user host-key returns 40300 | `396687555` | 通过，HTTP 403 / 40300 |
+| approved user ssh-test returns 40300 | `396687556` | 通过，HTTP 403 / 40300 |
+| forbidden CIDR returns 40301 | `396687558` | 通过，HTTP 403 / 40301 |
+| forbidden port returns 40301 | `396687562` | 通过，HTTP 403 / 40301 |
+
+每个用例均为 3 个断言全部通过：HTTP 状态、业务码和 `X-Request-ID`。
+
+## 十一、B2-R 结论
+
+原先 4 个未通过用例已完成前置条件修正并全部通过。此前失败原因确实是：
+
+- 普通用户 Token 未准备，错误使用管理员 Token。
+- CIDR 和端口用例引用的服务器 ID 在当前隔离库不存在。
+- 原用例部分路径快照和断言数组不完整，已同步修正。
+
+本轮没有修改 Java 业务代码、数据库迁移或前端代码。
