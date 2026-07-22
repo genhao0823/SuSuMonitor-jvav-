@@ -175,16 +175,16 @@ PUT /api/servers/99999
 {"description":"b2-probe"}
 ```
 
-用例创建 ID：`396683648`。Schema 校验通过，使用运行时管理员 JWT 执行后结果为：
+先前用例 `396683648` 已删除。本轮在重启后的最新服务上重新创建临时用例 `396684592`，Schema 校验通过；但执行时返回：
 
 ```text
-HTTP 400
-business code 40002
+HTTP 401
+business code 40100
 ```
 
-目标断言 `HTTP 404`、`business code 40400` 未通过。该结果与直接 HTTP 验证一致，说明当前 `18080` 运行进程仍加载 B2 修复前代码；Apifox 鉴权已成功，不是 `40100`。
+目标断言 `HTTP 404`、`business code 40400` 未通过。最新服务健康检查已通过，`40100` 表明本轮使用的聊天 Token 已过期，不能据此判断最新 B2 代码行为。
 
-测试完成后已删除临时 Apifox 用例 `396683648`，并删除本地临时 JSON 文件。删除前备份：
+测试完成后已删除临时 Apifox 用例 `396684592`，并删除本地临时 JSON 文件。删除前备份：
 
 ```text
 C:\Backup\SuSuMonitor\execution-20260723\apifox-b2-case-cleanup-20260722-182534\
@@ -199,7 +199,7 @@ C:\Backup\SuSuMonitor\execution-20260723\apifox-b2-case-cleanup-20260722-182534\
 ```text
 已有 11 个用例：7 个通过，4 个未通过
 17 个接口：未全部覆盖
-B2 PUT：Apifox 已授权执行，但当前运行进程返回 `40002`，真实验收未通过
+B2 PUT：最新服务已启动，但测试 Token 已过期，真实验收仍待有效 Token
 ```
 
 备份：
