@@ -146,6 +146,7 @@ npm run dev    # http://127.0.0.1:5173,自动代理 /api → :18080
 | 路由切换 loading bar(NProgress) | ✅ | UX 打磨 |
 | M6 实时监控页(ticket + WS + REST 历史 + 卡片 + 表) | ✅ | M6 |
 | OpenAPI 契约 lint 脚本 | ✅ | 自动化 |
+| catch-up 静态审计(audit:catchup,11 条规则 v0.2) | ✅ | 自动化 |
 | pre-commit 钩子(跑 openapi:check) | ✅ | 自动化 |
 | 服务器列表 spark line | ⚠️ mock | 等待 metrics history 接口 |
 | 上次 SSH 测试结果卡 | ⚠️ 占位 | 等待 SSH test history 接口 |
