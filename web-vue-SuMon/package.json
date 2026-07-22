@@ -14,7 +14,8 @@
     "format": "prettier --write \"src/**/*.{ts,vue,css,md}\" \"*.{ts,js,json,md}\"",
     "openapi:check": "node scripts/check-openapi.mjs",
     "audit:catchup": "node scripts/audit-catchup.mjs",
-    "api:e2e": "node scripts/api-e2e-test.mjs"
+    "api:e2e": "node scripts/api-e2e-test.mjs",
+    "ui:e2e": "node scripts/ui-e2e-test.mjs"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.0",
@@ -39,6 +40,7 @@
     "openapi-typescript": "^7.0.0",
     "playwright": "^1.61.1",
     "prettier": "^3.3.0",
+    "puppeteer-core": "^25.3.0",
     "typescript": "^5.5.0",
     "unplugin-auto-import": "^0.18.0",
     "unplugin-vue-components": "^0.27.0",
