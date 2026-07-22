@@ -147,6 +147,7 @@ npm run dev    # http://127.0.0.1:5173,自动代理 /api → :18080
 | M6 实时监控页(ticket + WS + REST 历史 + 卡片 + 表) | ✅ | M6 |
 | OpenAPI 契约 lint 脚本 | ✅ | 自动化 |
 | catch-up 静态审计(audit:catchup,11 条规则 v0.2) | ✅ | 自动化 |
+| HTTP API 自动化测试(api:e2e) | ✅ | 自动化 |
 | pre-commit 钩子(跑 openapi:check) | ✅ | 自动化 |
 | 服务器列表 spark line | ⚠️ mock | 等待 metrics history 接口 |
 | 上次 SSH 测试结果卡 | ⚠️ 占位 | 等待 SSH test history 接口 |
@@ -163,6 +164,7 @@ npm run dev    # http://127.0.0.1:5173,自动代理 /api → :18080
 | `npm run format` | Prettier 格式化 |
 | `npm run openapi:check` | OpenAPI 契约 lint |
 | `npm run audit:catchup` | catch-up 静态审计(11 条规则,扫魔法数字 / 参数名 / API 路径 / 占位密码 / TS any / 残留日志) |
+| `npm run api:e2e` | HTTP API 自动化测试(覆盖 17 路径中的 HTTP 部分) |
 
 ### 目录结构(2026-07-21 更新)
 
