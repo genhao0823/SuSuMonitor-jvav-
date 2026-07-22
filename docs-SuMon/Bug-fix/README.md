@@ -8,7 +8,7 @@
 | 日期 | 代号 | 标题 | 优先级 | 模块 | 状态 |
 |---|---|---|---|---|---|
 | 2026-07-21 | M4-server-list-sort-ignored | `GET /api/servers` 排序参数被忽略 | 高 | 服务器管理 | 未修复（前端用客户端排序绕过） |
-| 2026-07-21 | M4-server-put-existence-check | `PUT /api/servers/{id}` 校验顺序问题(不存在也报参数错) | 中 | 服务器管理 | 未修复 |
+| 2026-07-21 | M4-server-put-existence-check | `PUT /api/servers/{id}` 校验顺序问题(不存在也报参数错) | 中 | 服务器管理 | 代码已修复，真实 HTTP 待验证 |
 | 2026-07-21 | M4-ssh-test-error-code | `POST /api/servers/{id}/ssh/test` 错误码笼统 | 中 | SSH 连接 | 未修复 |
 | 2026-07-21 | M4-server-list-soft-delete | 列表是否过滤已软删除数据待确认 | 低 | 服务器管理 | 未修复 |
 
