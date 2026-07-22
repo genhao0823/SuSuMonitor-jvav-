@@ -6,6 +6,7 @@
     >
       <template #actions>
         <el-button
+          v-if="auth.isAdmin"
           type="primary"
           class="server-list-view__create"
           @click="openCreate"
@@ -202,6 +203,7 @@
               详情
             </el-button>
             <el-button
+              v-if="auth.isAdmin"
               size="small"
               type="primary"
               plain
@@ -210,6 +212,7 @@
               编辑
             </el-button>
             <el-button
+              v-if="auth.isAdmin"
               size="small"
               plain
               @click="handleTestConnection(row as Server)"
@@ -217,6 +220,7 @@
               测试连接
             </el-button>
             <el-popconfirm
+              v-if="auth.isAdmin"
               :title="`确定要删除 ${(row as Server).name} 吗?`"
               confirm-button-text="删除"
               cancel-button-text="取消"
@@ -265,9 +269,12 @@ import PageHeader from '@/components/PageHeader.vue'
 import ServerFormDialog from '@/components/ServerFormDialog.vue'
 import { ApiBusinessError } from '@/api/client'
 import { deleteServer, listServers } from '@/api/server'
+import { useAuthStore } from '@/stores/auth'
 import { ErrorCode } from '@/types/error-code'
 import type { Server, ServerQuery } from '@/types/api'
 import { formatDateTime, serverStatusLabel } from '@/utils/format'
+
+const auth = useAuthStore()
 
 const router = useRouter()
 
