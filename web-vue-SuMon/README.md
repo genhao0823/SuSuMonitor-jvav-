@@ -161,7 +161,7 @@ npm run dev    # http://127.0.0.1:5173,自动代理 /api → :18080
 | `npm run lint` / `lint:fix` | ESLint |
 | `npm run format` | Prettier 格式化 |
 | `npm run openapi:check` | OpenAPI 契约 lint |
-| `npm run audit:catchup` | catch-up 静态审计(6 条规则,扫魔法数字 / 参数名 / API 路径) |
+| `npm run audit:catchup` | catch-up 静态审计(11 条规则,扫魔法数字 / 参数名 / API 路径 / 占位密码 / TS any / 残留日志) |
 
 ### 目录结构(2026-07-21 更新)
 

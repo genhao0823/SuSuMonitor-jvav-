@@ -4,7 +4,7 @@
  * 捕获魔法数字 / 参数名错误 / API 路径拼错 / OpenAPI schema 漂移等
  * catch-up 阶段常见的隐藏 bug。
  *
- * 6 条审计规则:见 RULES 数组。
+ * 11 条审计规则:见 RULES 数组(6 regex + 2 customCheck)。
  * 设计原则:纯只读、离线、零依赖、CI 友好(退出码 0/1)。
  *
  * 用法:`npm run audit:catchup`
@@ -75,6 +75,53 @@ const RULES = [
     severity: 'WARN',
     description: 'API 调用路径与 OpenAPI 实际定义不符',
     customCheck: true
+  },
+  {
+    id: 'HARDCODED_DEFAULT_PASSWORD',
+    severity: 'ERROR',
+    description: '占位符密码 / 默认密码残留',
+    pattern: /\b(ssh_password|password|api_key|secret|token)\s*[:=]\s*['"]?(PLACEHOLDER|TODO|CHANGEME|REPLACE_ME|<.+?>|password|123456|admin|root)['"]?/gi,
+    filter: (_, match) => !match.includes('placeholder'),
+    message: (file, m) =>
+      `[HARDCODED_DEFAULT_PASSWORD] ${relative(REPO_ROOT, file)}:${lineOf(file, m.index)} ` +
+      `占位符密码 "${m[0]}" — 应使用环境变量或运行时配置`
+  },
+  {
+    id: 'CONSOLE_LOG_RESIDUAL',
+    severity: 'INFO',
+    description: 'console.log 残留(排除 console.error / warn)',
+    pattern: /(?<!error|warn|info|debug)\.console\.log\(/g,
+    requiresFile: /\.(vue|ts)$/,
+    excludeFile: /scripts\//,
+    message: (file, m) =>
+      `[CONSOLE_LOG_RESIDUAL] ${relative(REPO_ROOT, file)}:${lineOf(file, m.index)} ` +
+      `console.log 残留 — 评估是否删或换 logger`
+  },
+  {
+    id: 'TS_ANY',
+    severity: 'WARN',
+    description: 'TypeScript any 类型 — 用 unknown 或具体类型',
+    pattern: /(:\s*any\b|<any>|as\s+any\b)/g,
+    requiresFile: /\.(vue|ts)$/,
+    message: (file, m) =>
+      `[TS_ANY] ${relative(REPO_ROOT, file)}:${lineOf(file, m.index)} ` +
+      `any 类型 — 用 unknown 或具体类型`
+  },
+  {
+    id: 'COMMENTED_OUT_CODE',
+    severity: 'INFO',
+    description: '注释掉的代码块',
+    pattern: /\/\/\s*[\w]*(const|let|var|function|return|if|for|while)\b/g,
+    excludeFile: /auto-imports\.d\.ts$/,
+    message: (file, m) =>
+      `[COMMENTED_OUT_CODE] ${relative(REPO_ROOT, file)}:${lineOf(file, m.index)} ` +
+      `注释代码 — 真删不用`
+  },
+  {
+    id: 'LONG_FILE',
+    severity: 'INFO',
+    description: '文件 > 500 行 — 考虑拆分',
+    customCheck: true
   }
 ]
 
@@ -137,6 +184,24 @@ function checkApiPaths(definedPaths) {
 
 // ========== 主体 ==========
 
+// ========== LONG_FILE 自定义检查 ==========
+
+function checkLongFile(files) {
+  const findings = []
+  for (const file of files) {
+    const lineCount = readFileSync(file, 'utf8').split('\n').length
+    if (lineCount > 500) {
+      findings.push({
+        severity: 'INFO',
+        message: `[LONG_FILE] ${relative(REPO_ROOT, file)} 行数 ${lineCount} > 500 — 考虑拆分`
+      })
+    }
+  }
+  return findings
+}
+
+// ========== 主体 ==========
+
 function main() {
   console.log('Catch-up 静态审计')
   console.log('================================')
@@ -160,7 +225,7 @@ function main() {
       const re = new RegExp(rule.pattern.source, rule.pattern.flags)
       let m
       while ((m = re.exec(content)) !== null) {
-        if (rule.filter && !rule.filter(m[1])) continue
+        if (rule.filter && !rule.filter(m[1], m[0])) continue
         findings.push({ severity: rule.severity, message: rule.message(file, m) })
       }
     }
@@ -174,6 +239,9 @@ function main() {
     console.error('[audit:catchup] 加载 OpenAPI 失败(降级为跳过 API_PATH_TYPO):', e.message)
   }
 
+  // 1 条 customCheck:LONG_FILE
+  findings.push(...checkLongFile(files))
+
   // 排序
   const sevOrder = { ERROR: 0, WARN: 1, INFO: 2 }
   findings.sort((a, b) => sevOrder[a.severity] - sevOrder[b.severity] ||
@@ -185,7 +253,7 @@ function main() {
     console.log(`${icon} ${f.message}`)
   }
   if (findings.length === 0) {
-    console.log('✓ 所有文件通过 6 条审计规则')
+    console.log('✓ 所有文件通过 11 条审计规则')
   }
 
   console.log('')

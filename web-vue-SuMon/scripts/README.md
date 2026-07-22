@@ -115,16 +115,21 @@ catch-up 流程静态审计脚本。**在 catch-up 大批 commit 前后各跑一
 npm run audit:catchup
 ```
 
-扫描 `web-vue-SuMon/src/**/*.vue` / `*.ts`,对每份文件做 6 项规则审计:
+扫描 `web-vue-SuMon/src/**/*.vue` / `*.ts`,对每份文件做 11 项规则审计:
 
 | 规则 ID | 严重度 | 检测内容 |
 |---|---|---|
 | `MAGIC_PAGE_SIZE` | ERROR | `page_size: NNN` 硬编码 > 100 |
 | `PARAM_NAME_MISMATCH` | ERROR | router-link 用 `params.id`(路由是 `:serverId`) |
 | `ROUTE_PARAMS_ID` | ERROR | `route.params.id` 与路由 path 不匹配 |
+| `HARDCODED_DEFAULT_PASSWORD` | ERROR | 占位符密码 / 默认密码(PLACEHOLDER / admin / 123456) |
 | `API_PATH_TYPO` | WARN | `apiClient.*` 路径不在 OpenAPI 中 |
+| `TS_ANY` | WARN | TypeScript `any` 类型(`: any` / `<any>` / `as any`) |
 | `HARDCODED_HOST_PORT` | INFO | src/ 硬编码 host:port |
+| `CONSOLE_LOG_RESIDUAL` | INFO | `console.log` 残留 |
+| `COMMENTED_OUT_CODE` | INFO | 注释掉的代码块 |
 | `TODO_FETCHER` | INFO | `// TODO` 残留 |
+| `LONG_FILE` | INFO | .vue / .ts 文件 > 500 行(考虑拆分) |
 
 ### 输出示例(成功)
 
@@ -133,7 +138,7 @@ Catch-up 静态审计
 ================================
 扫描 36 个 .vue / .ts 文件...
 
-✓ 所有文件通过 6 条审计规则
+✓ 所有文件通过 11 条审计规则
 
 ================================
 0 ERROR / 0 WARN / 0 INFO
