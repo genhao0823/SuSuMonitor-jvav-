@@ -246,7 +246,7 @@ const editOpen = ref(false)
  * 解析路由参数 id(只接受数字,非法 id 直接跳回列表)。
  */
 function parseId(): number | null {
-  const raw = route.params.id
+  const raw = route.params.serverId
   const str = Array.isArray(raw) ? raw[0] : raw
   const n = Number(str)
   if (!Number.isFinite(n) || n <= 0) {
