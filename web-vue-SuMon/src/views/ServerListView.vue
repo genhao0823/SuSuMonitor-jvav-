@@ -296,12 +296,13 @@ const editingServer = ref<Server | null>(null)
 
 /**
  * 构建查询参数对象。
- * page_size 设为 999 一次拉全,前端做分页;后端排序参数仍发(后端忽略无害)。
+ * page_size 设为 100(后端 OpenAPI 约束 max=100,openapi-server.json:543),一次拉全,前端做分页;
+ * 后端排序参数仍发(后端忽略无害)。
  */
 function buildQuery(): ServerQuery {
   const q: ServerQuery = {
     page: 1,
-    page_size: 999,
+    page_size: 100,
     sort_by: sortBy.value,
     sort_order: sortOrder.value
   }
