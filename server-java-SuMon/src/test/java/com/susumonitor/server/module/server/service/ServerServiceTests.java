@@ -29,12 +29,16 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DuplicateKeyException;
 
@@ -249,6 +253,57 @@ class ServerServiceTests {
         assertEquals(2, result.getPage());
         assertEquals(10, result.getPageSize());
         assertEquals(1, result.getItems().size());
+    }
+
+    /** 验证可选分页和排序字段为空时使用服务端默认值。 */
+    @Test
+    void listWithNullOptionalValuesShouldUseDefaults() {
+        ServerQueryRequest request = new ServerQueryRequest();
+        request.setPage(null);
+        request.setPageSize(null);
+        request.setSortBy(null);
+        request.setSortOrder(null);
+        when(serverMapper.countActiveServers(null)).thenReturn(0L);
+        when(serverMapper.selectActiveServers(null, 0L, 20, "id", "desc"))
+                .thenReturn(List.of());
+
+        PageResult<ServerVo> result = serverService.list(request);
+
+        assertEquals(1, result.getPage());
+        assertEquals(20, result.getPageSize());
+        verify(serverMapper).selectActiveServers(null, 0L, 20, "id", "desc");
+    }
+
+    /** 验证非法排序方向在访问任何 Mapper 查询前失败。 */
+    @Test
+    void listWithInvalidSortOrderShouldFailBeforeMapperAccess() {
+        ServerQueryRequest request = new ServerQueryRequest();
+        request.setSortOrder("ascending");
+
+        assertError(ErrorCode.INVALID_REQUEST_PARAMETER, () -> serverService.list(request));
+        verify(serverMapper, never()).countActiveServers(any());
+        verify(serverMapper, never()).selectActiveServers(any(), anyLong(), any(Integer.class), anyString(), anyString());
+    }
+
+    /** 验证所有排序字段和方向均完整透传到真实 Mapper 方法签名。 */
+    @ParameterizedTest
+    @MethodSource("sortValues")
+    void listShouldPassWhitelistedSortValuesToMapper(String sortBy, String sortOrder) {
+        ServerQueryRequest request = new ServerQueryRequest();
+        request.setSortBy(sortBy);
+        request.setSortOrder(sortOrder);
+        when(serverMapper.countActiveServers(null)).thenReturn(0L);
+        when(serverMapper.selectActiveServers(null, 0L, 20, sortBy, sortOrder)).thenReturn(List.of());
+
+        serverService.list(request);
+
+        verify(serverMapper).selectActiveServers(null, 0L, 20, sortBy, sortOrder);
+    }
+
+    /** 提供服务层允许的排序字段和方向组合。 */
+    private static Stream<Arguments> sortValues() {
+        return Stream.of("id", "name", "host", "status", "created_at", "updated_at")
+                .flatMap(sortBy -> Stream.of(Arguments.of(sortBy, "asc"), Arguments.of(sortBy, "desc")));
     }
 
     /** 验证非法排序字段在访问 Mapper 前返回参数错误。 */

@@ -39,8 +39,12 @@ import com.susumonitor.server.security.JwtTokenService;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -291,6 +295,60 @@ class ServerControllerTests {
                         .param("sort_by", "ssh_password"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(40002));
+    }
+
+    /** 验证非法排序方向在进入 Service 前返回统一参数错误。 */
+    @Test
+    void invalidSortOrderShouldReturnBadRequest() throws Exception {
+        authenticateAdmin();
+
+        mockMvc.perform(get("/api/servers")
+                        .header(AUTHORIZATION, ADMIN_BEARER)
+                        .param("sort_order", "ascending"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(40002));
+
+        verify(serverService, never()).list(any(ServerQueryRequest.class));
+    }
+
+    /** 验证未传排序参数时使用稳定的 id 降序默认值。 */
+    @Test
+    void missingSortParametersShouldUseDefaults() throws Exception {
+        authenticateAdmin();
+        when(serverService.list(any(ServerQueryRequest.class))).thenReturn(pageResult(serverVo()));
+
+        mockMvc.perform(get("/api/servers").header(AUTHORIZATION, ADMIN_BEARER))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<ServerQueryRequest> captor = ArgumentCaptor.forClass(ServerQueryRequest.class);
+        verify(serverService).list(captor.capture());
+        assertEquals("id", captor.getValue().getSortBy());
+        assertEquals("desc", captor.getValue().getSortOrder());
+    }
+
+    /** 验证所有公开排序字段均能从 HTTP 参数传递到 Service。 */
+    @ParameterizedTest
+    @MethodSource("sortFields")
+    void whitelistedSortFieldsShouldReachService(String sortBy) throws Exception {
+        authenticateAdmin();
+        when(serverService.list(any(ServerQueryRequest.class))).thenReturn(pageResult(serverVo()));
+
+        mockMvc.perform(get("/api/servers")
+                        .header(AUTHORIZATION, ADMIN_BEARER)
+                        .param("sort_by", sortBy)
+                        .param("sort_order", "asc"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<ServerQueryRequest> captor = ArgumentCaptor.forClass(ServerQueryRequest.class);
+        verify(serverService).list(captor.capture());
+        assertEquals(sortBy, captor.getValue().getSortBy());
+        assertEquals("asc", captor.getValue().getSortOrder());
+    }
+
+    /** 提供 REST 契约声明的排序字段白名单。 */
+    private static Stream<Arguments> sortFields() {
+        return Stream.of("id", "name", "host", "status", "created_at", "updated_at")
+                .map(Arguments::of);
     }
 
     /**
