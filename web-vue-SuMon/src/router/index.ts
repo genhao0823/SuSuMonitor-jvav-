@@ -60,6 +60,12 @@ const protectedChildren: RouteRecordRaw[] = [
     component: () => import('@/views/ServerDetailView.vue'),
     meta: { title: '服务器详情', requiresAuth: true }
   },
+  {
+    path: 'servers/:serverId(\\d+)/metrics',
+    name: 'server-metrics',
+    component: () => import('@/views/MetricsView.vue'),
+    meta: { title: '服务器监控', requiresAuth: true }
+  },
 {
     path: '/admin/users',
     name: 'admin-users',

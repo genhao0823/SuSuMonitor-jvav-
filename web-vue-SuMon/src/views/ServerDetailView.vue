@@ -31,6 +31,15 @@
         >
           编辑
         </el-button>
+        <el-button
+          type="success"
+          plain
+          :disabled="!data"
+          class="server-detail-view__metrics"
+          @click="goMetrics"
+        >
+          实时监控
+        </el-button>
         <el-popconfirm
           :title="data ? `确定要删除 ${data.name} 吗?` : '确定要删除吗?'"
           confirm-button-text="删除"
@@ -291,6 +300,11 @@ function goBack(): void {
 
 function openEdit(): void {
   editOpen.value = true
+}
+
+function goMetrics(): void {
+  if (data.value === null) return
+  void router.push({ name: 'server-metrics', params: { serverId: data.value.id } })
 }
 
 function handleTestConnection(): void {
