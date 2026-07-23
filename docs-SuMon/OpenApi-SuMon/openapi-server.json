@@ -832,7 +832,7 @@
           {
             "type": "object",
             "properties": {
-              "code": {"type": "integer", "format": "int32", "enum": [40002, 40100, 40300, 40301, 40400, 40900, 40901, 40902, 42900, 50000, 50001, 50002, 50400]},
+              "code": {"type": "integer", "format": "int32", "enum": [40002, 40100, 40300, 40301, 40400, 40900, 40901, 40902, 42900, 50000, 50001, 50002, 50003, 50400]},
               "data": {"nullable": true, "example": null}
             }
           }
@@ -973,7 +973,10 @@
         "content": {
           "application/json": {
             "schema": {"$ref": "#/components/schemas/ErrorResponse"},
-            "example": {"code": 50002, "message": "ssh connection failed", "data": null}
+            "examples": {
+              "connectionFailed": {"value": {"code": 50002, "message": "ssh connection failed", "data": null}},
+              "authenticationFailed": {"value": {"code": 50003, "message": "ssh authentication failed", "data": null}}
+            }
           }
         }
       },

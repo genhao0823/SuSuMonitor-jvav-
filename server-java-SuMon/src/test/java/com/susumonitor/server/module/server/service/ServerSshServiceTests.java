@@ -314,6 +314,7 @@ class ServerSshServiceTests {
             case DATABASE_ERROR -> ErrorCode.DATABASE_ERROR;
             case CONNECTION_LIMIT -> ErrorCode.SSH_CONNECTION_LIMIT_REACHED;
             case TIMEOUT -> ErrorCode.SSH_CONNECTION_TIMEOUT;
+            case AUTHENTICATION_FAILED -> ErrorCode.SSH_AUTHENTICATION_FAILED;
             case CONNECTION_FAILED -> ErrorCode.SSH_CONNECTION_FAILED;
         };
     }

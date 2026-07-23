@@ -565,6 +565,22 @@ class ServerControllerTests {
         verify(serverSshService, never()).testConnection(any());
     }
 
+    /** 验证 SSH 凭据认证失败映射为 50003 和 HTTP 502。 */
+    @Test
+    void sshAuthenticationFailureShouldReturnBadGateway() throws Exception {
+        authenticateAdmin();
+        doThrow(new BusinessException(ErrorCode.SSH_AUTHENTICATION_FAILED))
+                .when(serverSshService).testConnection(1L);
+
+        mockMvc.perform(post("/api/servers/1/ssh/test")
+                        .header(AUTHORIZATION, ADMIN_BEARER)
+                        .contentType(JSON_CONTENT_TYPE)
+                        .content(""))
+                .andExpect(status().isBadGateway())
+                .andExpect(header().string("X-Request-ID", not(blankOrNullString())))
+                .andExpect(jsonPath("$.code").value(50003));
+    }
+
     /** 配置管理员 JWT 和数据库最新状态回查。 */
     private void authenticateAdmin() {
         when(jwtTokenService.parseToken(ADMIN_TOKEN))

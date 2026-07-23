@@ -42,6 +42,7 @@ public class SshConnectionException extends RuntimeException {
         DATABASE_ERROR,
         CONNECTION_LIMIT,
         TIMEOUT,
+        AUTHENTICATION_FAILED,
         CONNECTION_FAILED
     }
 }

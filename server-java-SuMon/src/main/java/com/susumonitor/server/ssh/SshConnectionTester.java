@@ -25,6 +25,7 @@ import net.schmizz.sshj.common.KeyType;
 import net.schmizz.sshj.transport.verification.FingerprintVerifier;
 import net.schmizz.sshj.transport.verification.HostKeyVerifier;
 import net.schmizz.sshj.userauth.keyprovider.KeyProvider;
+import net.schmizz.sshj.userauth.UserAuthException;
 import net.schmizz.sshj.userauth.password.PasswordFinder;
 import net.schmizz.sshj.userauth.password.PasswordUtils;
 import org.springframework.stereotype.Component;
@@ -203,6 +204,8 @@ public class SshConnectionTester implements AutoCloseable {
                 return verifier.observation();
             } catch (SshConnectionException exception) {
                 throw exception;
+            } catch (UserAuthException exception) {
+                throw new SshConnectionException(SshConnectionException.Category.AUTHENTICATION_FAILED, exception);
             } catch (IOException | RuntimeException exception) {
                 ensureActive(cancelled);
                 if (verifier.observed() && !verifier.matched()) {
