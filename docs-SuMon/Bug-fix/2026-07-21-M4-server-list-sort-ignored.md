@@ -180,12 +180,12 @@ POST /api/auth/login：admin / 运行时提供新凭据返回 HTTP 200、业务�
 | 非法 `sort_by` | 400 | `40002` | - | - | 存在 |
 | 非法 `sort_order` | 400 | `40002` | - | - | 存在 |
 
-当前 HTTP 实例只有 2 条有效服务器，因此 name/host 缺少更多独立样本；完整字段顺序由真实 MySQL IT 覆盖。Apifox CLI 排序用例本轮未执行，HTTP 结果不冒充 Apifox 结果。
+当前 HTTP 实例样本由开发库 active 服务器提供；完整字段顺序由真实 MySQL IT 覆盖。J5 已在 Apifox AI 分支 `ai/20260723-from-main-server-sort-validation` 创建并执行 9 个排序用例，9 个 HTTP 请求、30 个断言全部通过，失败数为 0。报告未上传云端。
 
 J2 独立提交：
 
 ```text
 已提交：`4d95c5e test(server): 验证服务器列表排序行为`
 
-真实 MySQL 和 HTTP 验收记录已在本轮追加的 Java 后端执行日志中留痕；Apifox CLI 排序用例仍未执行。
+真实 MySQL、HTTP 和 Apifox CLI 验收记录已在 Java 后端执行日志中留痕。
 ```

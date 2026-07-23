@@ -172,4 +172,14 @@ async function handleTestConnection(row: Server): Promise<void> {
 | 超时契约 | 保持 `50400` |
 | OpenAPI | 错误码枚举和 502 示例已包含 `50003` |
 
-真实 SSH 认证失败运行时验证需要受控 SSH 服务和专用测试凭据，本轮未伪造该外部环境结果。
+## J5 真实 SSH 验收结果（2026-07-23）
+
+已复用 WSL Ubuntu 24.04.4 的受控 OpenSSH 服务，监听 `2222`；创建专用用户 `susu-ssh-j5-20260723`。开发库测试服务器为唯一记录 ID `39`，删除前已备份：
+
+```text
+C:\Backup\SuSuMonitor\java-backend-closure-20260723\J5-susumonitor-before-ssh-apifox-20260723.sql
+```
+
+TCP 连接、SSH KEX 和 Java 出站策略均已通过，但 sshj 主机密钥握手返回 `50002`，未成功登记主机指纹，因此未到达用户认证阶段，不能将本轮记为真实 `50003` 通过。使用实际 ED25519 和 RSA 指纹分别重试后仍为 `50002`，需后续排查 sshj 0.39.0 与当前 OpenSSH 主机密钥协商兼容性。
+
+测试服务器 ID `39` 随后仅通过业务接口软删除：HTTP 200、业务码 0；数据库行保留且 `deleted=1`、`deleted_at` 非空、`delete_token` 非空。未执行物理删除、TRUNCATE、DROP 或数据库重置。
