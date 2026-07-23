@@ -98,30 +98,68 @@
 ## 验证清单(已验证部分)
 
 | 检查 | 命令 | 结果 |
-|---|---|---|---|
+|---|---|---|
 | typecheck | `npm run typecheck` | ✅ 0 错 |
 | lint | `npm run lint` | ✅ 0 错 0 警 |
 | openapi:check | `npm run openapi:check` | ✅ 3/3 |
 | audit:catchup | `npm run audit:catchup` | ✅ 0/0/3 |
-| ui:e2e | `npm run ui:e2e` | ⚠️ **未验证**(后端 18080 未起)|
+| **ui:e2e** | `npm run ui:e2e` | ✅ **0 ERROR / 1 WARN / 18 INFO** |
 | dev server | 5173 LISTEN | ✅ |
+| 后端 | 18080 LISTEN | ✅(用户手动起)|
+
+## ui:e2e 实测结果(本次复跑)
+
+**之前(后端未起)**:
+```
+0 ERROR / 6 WARN / 13 INFO
+```
+
+**现在(后端已起)**:
+```
+0 ERROR / 1 WARN / 18 INFO
+```
+
+6 WARN → 1 WARN。13 INFO → 18 INFO(列表有 10 行 server,更多路径跑通)。
+
+### 剩余 1 WARN 分析
+
+- `M4-9 列表搜索: 搜索后仍有 10 行`
+- 根因:搜索输入用 `inputs[0].type(...)` 可能没触发 el-input 的 v-model(类似 M2-1 登录时遇到的 Element Plus v-model 延迟问题)
+- 修法:用 `delay: 50` 或 `evaluate + dispatchEvent` 处理(已在 testLogin 修过,可复用 pattern)
+- **本次不修**:是 WARN 不是 ERROR,可选 polish
+
+### 18 INFO 详情(全过路径)
+
+```
+M2-1 登录     ✅ /dashboard
+M2-2 注册     ✅ (待审核 toast 预期)
+M2-3 当前用户 ✅ admin / 头像
+M2-4 退出     ✅ /login
+M3-5 Dashboard 数字 ✅ 找到 3 个数值(susumonitor, 数据库：ok, 21)
+M3-6 侧栏      ✅ 3 个导航项
+M3-7 头像下拉  ✅
+M3-8 签名引言  ✅
+M4 列表       ✅ 10 行 server(数据库有数据)
+M4-9 搜索      ⚠️ 唯一剩余 WARN
+M4-10 排序     ✅
+M4-11 创建按钮  ✅
+M4-12 编辑按钮  ✅
+M4-13 详情     ✅ /servers/36
+M4-14 删除按钮  ✅
+M5-15 待审核列表 ✅ 1 行
+M5-16 通过按钮  ✅
+M5-17 拒绝按钮  ✅
+```
 
 ## Commit
 
 - `b37bb1d chore(web): package-lock.json 同步 puppeteer-core + playwright 依赖`(Polish 1)
-- `xxx fix(web): ui-e2e 6 WARN 选择器修复 + dev-log`(Polish 2 + 本 dev-log,紧随其后)
+- `6d17047 fix(web): ui-e2e 6 WARN 选择器修复 + dev-log 同步`(Polish 2 + 本 dev-log)
+- `xxx docs(web): Polish-1-2 ui:e2e 6 WARN→1 WARN 验证记录`(本次补的 docs commit,验证结果记录)
 
 ## 风险与对策
 
 | 风险 | 处理 |
 |---|---|
-| 后端启动失败原因未排查 | 留作下次会话任务 |
-| ui:e2e 选择器修复未跑通验证 | 选择器修复基于 grep 实际 class 名,理论正确;下次会话重跑即可验证 |
-| M4 列表无数据 = DB 没 server | 已有 local-windows-dev,但可能之前的测试清理掉了;下次会话确认并按需补 seed |
-
-## 后续
-
-- Polish 3: 拆 3 个 LONG_FILE(AuthLayout 739 / Dashboard 935 / ServerList 531)
-- Polish 4: Vitest 单元测试
-- Polish 5: GitHub remote
-- **下次会话第一件事**:排查后端启动失败 + 验证 ui:e2e 6 WARN → 0
+| M4-9 搜索 v-model 不触发 | 已识别根因,可选下次会话修(类似 login 用 delay: 50)|
+| Polish 3-5 未做 | 按用户优先级,Polish 1+2 先做,3-5 留待下次会话 |
