@@ -39,6 +39,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DuplicateKeyException;
 
@@ -371,6 +373,34 @@ class ServerServiceTests {
         when(serverMapper.softDeleteActiveServer(eq(99L), any(), anyString())).thenReturn(0);
 
         assertError(ErrorCode.RESOURCE_NOT_FOUND, () -> serverService.delete(99L));
+    }
+
+    /** 验证删除方法拒绝非法 ID 且不访问数据库。 */
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(longs = {0L, -1L})
+    void deleteInvalidIdShouldFailBeforeMapperAccess(Long serverId) {
+        assertError(ErrorCode.INVALID_REQUEST_PARAMETER, () -> serverService.delete(serverId));
+
+        verify(serverMapper, never()).softDeleteActiveServer(anyLong(), any(), anyString());
+    }
+
+    /** 验证软删除数据库异常统一映射为数据库错误。 */
+    @Test
+    void deleteDatabaseFailureShouldReturnDatabaseError() {
+        when(serverMapper.softDeleteActiveServer(eq(7L), any(), anyString()))
+                .thenThrow(new DataAccessResourceFailureException("database unavailable"));
+
+        assertError(ErrorCode.DATABASE_ERROR, () -> serverService.delete(7L));
+    }
+
+    /** 验证软删除唯一键冲突统一映射为资源冲突。 */
+    @Test
+    void deleteDuplicateKeyShouldReturnConflict() {
+        when(serverMapper.softDeleteActiveServer(eq(7L), any(), anyString()))
+                .thenThrow(new DuplicateKeyException("duplicate"));
+
+        assertError(ErrorCode.RESOURCE_CONFLICT, () -> serverService.delete(7L));
     }
 
     /** 验证创建唯一键冲突映射为 40900。 */

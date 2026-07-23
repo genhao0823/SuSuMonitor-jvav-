@@ -45,6 +45,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -280,6 +281,35 @@ class ServerControllerTests {
         mockMvc.perform(get("/api/servers/0").header(AUTHORIZATION, ADMIN_BEARER))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(40002));
+    }
+
+    /** 验证 DELETE 路径上的非正数 ID 在进入 Service 前返回参数错误。 */
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1"})
+    void deletingInvalidIdShouldReturnBadRequest(String serverId) throws Exception {
+        authenticateAdmin();
+
+        mockMvc.perform(delete("/api/servers/" + serverId)
+                        .header(AUTHORIZATION, ADMIN_BEARER))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(40002))
+                .andExpect(header().string("X-Request-ID", not(blankOrNullString())));
+
+        verify(serverService, never()).delete(any(Long.class));
+    }
+
+    /** 验证删除不存在资源时返回统一 404 响应。 */
+    @Test
+    void deletingMissingServerShouldReturnNotFound() throws Exception {
+        authenticateAdmin();
+        doThrow(new BusinessException(ErrorCode.RESOURCE_NOT_FOUND))
+                .when(serverService).delete(99L);
+
+        mockMvc.perform(delete("/api/servers/99")
+                        .header(AUTHORIZATION, ADMIN_BEARER))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(40400))
+                .andExpect(header().string("X-Request-ID", not(blankOrNullString())));
     }
 
     /**

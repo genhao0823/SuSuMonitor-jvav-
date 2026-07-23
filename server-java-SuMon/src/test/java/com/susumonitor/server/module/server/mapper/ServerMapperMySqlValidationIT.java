@@ -3,10 +3,13 @@ package com.susumonitor.server.module.server.mapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.susumonitor.server.module.server.entity.ServerEntity;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -73,6 +76,43 @@ class ServerMapperMySqlValidationIT {
             assertEquals(3, result.size());
             assertTrue(result.stream().noneMatch(row -> Boolean.TRUE.equals(row.getDeleted())));
             assertFalse(result.stream().anyMatch(row -> row.getName().contains("deleted")));
+        });
+    }
+
+    /** 验证真实软删除会保留记录、写入删除字段，并在 active 条件下幂等失效。 */
+    @Test
+    void softDeleteShouldSetDeletionFieldsAndBeIdempotentForActiveCondition() {
+        withTestRows(() -> {
+            Long id = jdbcTemplate.queryForObject(
+                    "SELECT id FROM servers WHERE name = ?", Long.class, TEST_PREFIX + "-alpha");
+            LocalDateTime deletedAt = LocalDateTime.of(2026, 7, 23, 12, 0);
+            String deleteToken = UUID.randomUUID().toString();
+
+            assertEquals(1, serverMapper.softDeleteActiveServer(id, deletedAt, deleteToken));
+            Map<String, Object> row = jdbcTemplate.queryForMap(
+                    "SELECT id, deleted, deleted_at, delete_token FROM servers WHERE id = ?", id);
+            assertEquals(id, ((Number) row.get("id")).longValue());
+            assertEquals(Boolean.TRUE, row.get("deleted"));
+            assertEquals(deletedAt, row.get("deleted_at"));
+            assertEquals(deleteToken, row.get("delete_token"));
+            assertEquals(0, serverMapper.softDeleteActiveServer(id, deletedAt.plusMinutes(1), "second-token"));
+        });
+    }
+
+    /** 验证详情、状态、SSH、主机密钥和 Agent Token 的 active 查询均过滤软删除行。 */
+    @Test
+    void allActiveServerReadsShouldExcludeSoftDeletedRow() {
+        withTestRows(() -> {
+            Long id = jdbcTemplate.queryForObject(
+                    "SELECT id FROM servers WHERE name = ?", Long.class, TEST_PREFIX + "-alpha");
+            assertEquals(1, serverMapper.softDeleteActiveServer(id, CREATED_AT, UUID.randomUUID().toString()));
+
+            assertNull(serverMapper.selectActiveServerById(id));
+            assertNull(serverMapper.selectActiveServerWithCredentialsById(id));
+            assertNull(serverMapper.selectActiveServerStatusById(id));
+            assertNull(serverMapper.selectActiveServerHostKeyById(id));
+            assertNull(serverMapper.selectActiveServerSshById(id));
+            assertNull(serverMapper.selectActiveServerAgentTokenById(id));
         });
     }
 
