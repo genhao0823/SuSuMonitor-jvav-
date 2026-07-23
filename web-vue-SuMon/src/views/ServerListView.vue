@@ -33,83 +33,16 @@
       class="server-list-view__card"
       shadow="never"
     >
-      <div class="server-list-view__toolbar">
-        <el-input
-          v-model="searchName"
-          placeholder="按名称搜索"
-          clearable
-          class="server-list-view__search"
-        >
-          <template #prefix>
-            <svg
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            >
-              <circle
-                cx="11"
-                cy="11"
-                r="6"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              />
-              <path
-                d="M16 16 L20 20"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-              />
-            </svg>
-          </template>
-        </el-input>
-        <el-input
-          v-model="searchHost"
-          placeholder="按主机地址搜索"
-          clearable
-          class="server-list-view__search"
-        >
-          <template #prefix>
-            <svg
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            >
-              <circle
-                cx="11"
-                cy="11"
-                r="6"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              />
-              <path
-                d="M16 16 L20 20"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-              />
-            </svg>
-          </template>
-        </el-input>
-        <el-select
-          v-model="pageSize"
-          class="server-list-view__page-size"
-          @change="onPageSizeChange"
-        >
-          <el-option
-            v-for="opt in pageSizeOptions"
-            :key="opt"
-            :label="`${opt} 条/页`"
-            :value="opt"
-          />
-        </el-select>
-        <el-button @click="reload">
-          刷新
-        </el-button>
-      </div>
+      <ServerSearchBar
+        :name-value="searchName"
+        :host-value="searchHost"
+        :page-size="pageSize"
+        :page-size-options="pageSizeOptions"
+        @update:name-value="(v: string) => { searchName = v }"
+        @update:host-value="(v: string) => { searchHost = v }"
+        @update:page-size="onPageSizeChange"
+        @reload="reload"
+      />
 
       <el-table
         v-loading="loading"
@@ -240,17 +173,14 @@
         </el-table-column>
       </el-table>
 
-      <div class="server-list-view__pagination">
-        <el-pagination
-          v-model:current-page="page"
-          v-model:page-size="pageSize"
-          :total="totalCount"
-          :page-sizes="pageSizeOptions"
-          layout="total, prev, pager, next, jumper"
-          background
-          @current-change="onPageChange"
-        />
-      </div>
+      <ServerPagination
+        :page="page"
+        :page-size="pageSize"
+        :total="totalCount"
+        :page-size-options="pageSizeOptions"
+        @update:page="(v: number) => { page = v }"
+        @update:page-size="onPageSizeChange"
+      />
     </el-card>
 
     <ServerFormDialog
@@ -267,6 +197,8 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
 import ServerFormDialog from '@/components/ServerFormDialog.vue'
+import ServerSearchBar from '@/components/ServerSearchBar.vue'
+import ServerPagination from '@/components/ServerPagination.vue'
 import { ApiBusinessError } from '@/api/client'
 import { deleteServer, listServers } from '@/api/server'
 import { useAuthStore } from '@/stores/auth'
@@ -279,12 +211,6 @@ const auth = useAuthStore()
 const router = useRouter()
 
 const loading = ref(false)
-/**
- * 后端拉到的原始顺序数据(后端忽略排序参数,默认按 id desc)。
- * 客户端排序在此数据副本上做,不修改引用。
- * 注意:这是 M4 临时方案。后端排序修好后(Bug-fix 文档记录),
- * 应删除本字段和 sortedRows/pagedRows/totalCount,恢复调 reload()。
- */
 const serverItems = ref<Server[]>([])
 
 const page = ref(1)
@@ -292,20 +218,12 @@ const pageSizeOptions: number[] = [10, 20, 50]
 const pageSize = ref<number>(pageSizeOptions[0])
 const searchName = ref('')
 const searchHost = ref('')
-/**
- * 排序状态。被 sortedRows computed 读取;不再触发网络请求。
- */
 const sortBy = ref<ServerQuery['sort_by']>('id')
 const sortOrder = ref<ServerQuery['sort_order']>('desc')
 
 const dialogVisible = ref(false)
 const editingServer = ref<Server | null>(null)
 
-/**
- * 构建查询参数对象。
- * page_size 设为 100(后端 OpenAPI 约束 max=100,openapi-server.json:543),一次拉全,前端做分页;
- * 后端排序参数仍发(后端忽略无害)。
- */
 function buildQuery(): ServerQuery {
   const q: ServerQuery = {
     page: 1,
@@ -324,10 +242,6 @@ function buildQuery(): ServerQuery {
   return q
 }
 
-/**
- * 客户端排序后的全量数据。
- * 默认状态(id desc 与后端默认一致)直接复用 serverItems 避免无谓复制。
- */
 const sortedRows = computed<Server[]>(() => {
   const data = serverItems.value
   if (data.length === 0) {
@@ -353,22 +267,13 @@ const sortedRows = computed<Server[]>(() => {
   return copy
 })
 
-/**
- * 当前页可见数据(前端分页)。
- */
 const pagedRows = computed<Server[]>(() => {
   const start = (page.value - 1) * pageSize.value
   return sortedRows.value.slice(start, start + pageSize.value)
 })
 
-/**
- * 总数 = 客户端全量长度,用于分页器显示。
- */
 const totalCount = computed<number>(() => serverItems.value.length)
 
-/**
- * 拉取服务器列表(全量)。失败抛出 ApiBusinessError。
- */
 async function fetchList(): Promise<void> {
   loading.value = true
   try {
@@ -379,9 +284,6 @@ async function fetchList(): Promise<void> {
   }
 }
 
-/**
- * 重新加载当前查询条件的列表。
- */
 async function reload(): Promise<void> {
   try {
     await fetchList()
@@ -390,9 +292,6 @@ async function reload(): Promise<void> {
   }
 }
 
-/**
- * 排序切换:仅更新本地状态,触发 sortedRows 重算。
- */
 function onSortChange(sort: { prop: string | null; order: 'ascending' | 'descending' | null }): void {
   if (sort.order === null || sort.prop === null) {
     sortBy.value = 'id'
@@ -404,17 +303,6 @@ function onSortChange(sort: { prop: string | null; order: 'ascending' | 'descend
   page.value = 1
 }
 
-/**
- * 分页器页码变化(纯本地)。
- */
-function onPageChange(_page: number): void {
-  // el-pagination v-model:current-page 已自动更新 page.value
-  // 此函数占位以接收事件,无需调后端
-}
-
-/**
- * 切换每页大小:仅更新本地状态,前端切片立即生效。
- */
 function onPageSizeChange(size: number): void {
   pageSize.value = size
   page.value = 1
@@ -434,17 +322,10 @@ function goDetail(row: Server): void {
   void router.push({ name: 'server-detail', params: { serverId: row.id } })
 }
 
-/**
- * SSH 测试连接按钮:目前后端 MVP-7 才接通真实实现,
- * 这里只展示占位文案,不让用户误以为已发起真实连接。
- */
 function handleTestConnection(_row: Server): void {
   ElMessage.info('测试连接功能将在 MVP-7 接入,敬请期待')
 }
 
-/**
- * 软删除服务器,删除成功刷新列表(全量重拉),失败提示。
- */
 async function handleDelete(row: Server): Promise<void> {
   try {
     await deleteServer(row.id)
@@ -458,9 +339,6 @@ async function handleDelete(row: Server): Promise<void> {
   }
 }
 
-/**
- * 把 ApiBusinessError 翻译为用户可见提示。
- */
 function explainError(error: unknown): string {
   if (error instanceof ApiBusinessError) {
     if (error.code === ErrorCode.RESOURCE_NOT_FOUND) {
@@ -518,33 +396,6 @@ onMounted(() => {
   vertical-align: -2px;
 }
 
-.server-list-view__toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-
-.server-list-view__search {
-  flex: 1;
-  min-width: 180px;
-  max-width: 280px;
-}
-
-.server-list-view__search :deep(.el-input__wrapper) {
-  background: rgba(255, 255, 255, 0.85);
-}
-
-.server-list-view__search :deep(.el-input__prefix svg) {
-  width: 14px;
-  height: 14px;
-}
-
-.server-list-view__page-size {
-  width: 130px;
-}
-
 .server-list-view__table {
   border-radius: 8px;
   overflow: hidden;
@@ -585,11 +436,5 @@ onMounted(() => {
 .server-list-view__status--unknown,
 .server-list-view__agent--unknown {
   background: linear-gradient(135deg, #f5b942 0%, #d97706 100%);
-}
-
-.server-list-view__pagination {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
 }
 </style>
