@@ -149,6 +149,7 @@ npm run dev    # http://127.0.0.1:5173,自动代理 /api → :18080
 | catch-up 静态审计(audit:catchup,11 条规则 v0.2) | ✅ | 自动化 |
 | HTTP API 自动化测试(api:e2e) | ✅ | 自动化 |
 | UI E2E 浏览器自动化(ui:e2e,puppeteer-core) | ✅ | 自动化 |
+| 代码拆分重构(Polish-3,拆 9 子组件) | ✅ | 自动化 |
 | pre-commit 钩子(跑 openapi:check) | ✅ | 自动化 |
 | 服务器列表 spark line | ⚠️ mock | 等待 metrics history 接口 |
 | 上次 SSH 测试结果卡 | ⚠️ 占位 | 等待 SSH test history 接口 |
