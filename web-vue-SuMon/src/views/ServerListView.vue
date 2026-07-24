@@ -114,6 +114,17 @@
           </template>
         </el-table-column>
         <el-table-column
+          label="CPU 趋势"
+          width="140"
+        >
+          <template #default="{ row }">
+            <ServerSparkLine
+              :data="cpuHistory(row.id)"
+              label="7d"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column
           prop="created_at"
           label="创建时间"
           width="180"
@@ -199,8 +210,10 @@ import PageHeader from '@/components/PageHeader.vue'
 import ServerFormDialog from '@/components/ServerFormDialog.vue'
 import ServerSearchBar from '@/components/ServerSearchBar.vue'
 import ServerPagination from '@/components/ServerPagination.vue'
+import ServerSparkLine from '@/components/ServerSparkLine.vue'
 import { ApiBusinessError } from '@/api/client'
 import { deleteServer, listServers, testSshConnection as testSsh } from '@/api/server'
+import { getMetricsHistory } from '@/api/metrics'
 import { useAuthStore } from '@/stores/auth'
 import { ErrorCode } from '@/types/error-code'
 import type { Server, ServerQuery, SshTestResult } from '@/types/api'
@@ -287,6 +300,8 @@ async function fetchList(): Promise<void> {
 async function reload(): Promise<void> {
   try {
     await fetchList()
+    // spark line 异步拉取,失败不影响列表展示
+    void loadAllSparkHistories()
   } catch (error) {
     ElMessage.error(explainError(error))
   }
@@ -306,6 +321,52 @@ function onSortChange(sort: { prop: string | null; order: 'ascending' | 'descend
 function onPageSizeChange(size: number): void {
   pageSize.value = size
   page.value = 1
+}
+
+/**
+ * spark line 数据缓存:Map<serverId, cpu_percent 序列>。
+ * 由 loadAllSparkHistories 在 reload 完成后异步填充。
+ */
+const sparkHistories = ref<Map<number, number[]>>(new Map())
+
+/**
+ * 给指定 serverId 返回其 CPU 趋势序列(供模板用)。
+ * 数据不足或尚未拉取时返回空数组,组件会显示空态。
+ */
+function cpuHistory(serverId: number): number[] {
+  return sparkHistories.value.get(serverId) ?? []
+}
+
+/**
+ * 拉取当前列表所有 server 的最近 7 天 metrics 历史(仅 cpu_percent)。
+ * 单个失败不影响其他,Promise.allSettled 兜底。
+ */
+async function loadAllSparkHistories(): Promise<void> {
+  const ids = serverItems.value.map((s) => s.id)
+  if (ids.length === 0) {
+    sparkHistories.value = new Map()
+    return
+  }
+  const end = new Date()
+  const start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000)
+  const startISO = start.toISOString()
+  const endISO = end.toISOString()
+  const next = new Map<number, number[]>()
+  const results = await Promise.allSettled(
+    ids.map((id) =>
+      getMetricsHistory(id, startISO, endISO, 1, 200)
+    )
+  )
+  ids.forEach((id, i) => {
+    const r = results[i]
+    if (r.status === 'fulfilled') {
+      const cpuSeries = r.value.data.items
+        .map((m) => m.cpu_percent)
+        .filter((v): v is number => v !== null)
+      next.set(id, cpuSeries)
+    }
+  })
+  sparkHistories.value = next
 }
 
 function openCreate(): void {
