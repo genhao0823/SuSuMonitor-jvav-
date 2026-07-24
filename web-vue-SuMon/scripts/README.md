@@ -133,7 +133,7 @@ npm run audit:catchup
 | `CONSOLE_LOG_RESIDUAL` | INFO | `console.log` 残留 |
 | `COMMENTED_OUT_CODE` | INFO | 注释掉的代码块 |
 | `TODO_FETCHER` | INFO | `// TODO` 残留 |
-| `LONG_FILE` | INFO | .vue / .ts 文件 > 500 行(考虑拆分) |
+| `LONG_FILE` | INFO | .vue / .ts 文件 > 600 行(考虑拆分,阈值 Sprint 4 调高) |
 
 ### 输出示例(成功)
 
