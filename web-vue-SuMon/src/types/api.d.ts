@@ -170,3 +170,16 @@ export interface UpdateServerRequest {
   ssh_private_key?: string
   ssh_private_key_passphrase?: string
 }
+
+/**
+ * SSH 连接测试结果(与后端 SshTestVo 字段对齐)。
+ */
+export interface SshTestResult {
+  server_id: number
+  connected: boolean
+  host_key_algorithm: string | null
+  host_key_fingerprint: string | null
+  auth_type: string
+  duration_ms: number
+  tested_at: string
+}

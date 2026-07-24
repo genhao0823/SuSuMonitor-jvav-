@@ -200,10 +200,10 @@ import ServerFormDialog from '@/components/ServerFormDialog.vue'
 import ServerSearchBar from '@/components/ServerSearchBar.vue'
 import ServerPagination from '@/components/ServerPagination.vue'
 import { ApiBusinessError } from '@/api/client'
-import { deleteServer, listServers } from '@/api/server'
+import { deleteServer, listServers, testSshConnection as testSsh } from '@/api/server'
 import { useAuthStore } from '@/stores/auth'
 import { ErrorCode } from '@/types/error-code'
-import type { Server, ServerQuery } from '@/types/api'
+import type { Server, ServerQuery, SshTestResult } from '@/types/api'
 import { formatDateTime, serverStatusLabel } from '@/utils/format'
 
 const auth = useAuthStore()
@@ -322,8 +322,55 @@ function goDetail(row: Server): void {
   void router.push({ name: 'server-detail', params: { serverId: row.id } })
 }
 
-function handleTestConnection(_row: Server): void {
-  ElMessage.info('测试连接功能将在 MVP-7 接入,敬请期待')
+function handleTestConnection(row: Server): void {
+  void testSsh(row.id)
+    .then((res: { data: SshTestResult }) => {
+      const r = res.data
+      if (r.connected) {
+        ElMessage.success(
+          `SSH 连接成功 (${r.duration_ms}ms) · 认证方式 ${r.auth_type}`
+        )
+      } else {
+        ElMessage.warning('SSH 连接失败,后端未返回详细原因')
+      }
+    })
+    .catch((error: unknown) => {
+      if (error instanceof ApiBusinessError) {
+        switch (error.code) {
+          case ErrorCode.SSH_AUTHENTICATION_FAILED:
+            ElMessage.error('SSH 认证失败:请检查用户名密码 / 私钥')
+            return
+          case ErrorCode.SSH_CONNECTION_TIMEOUT:
+            ElMessage.error('SSH 连接超时:请检查网络或防火墙')
+            return
+          case ErrorCode.SSH_HOST_KEY_NOT_CONFIRMED:
+            ElMessage.error('SSH 主机密钥未确认:请先在服务器端 trust 主机')
+            return
+          case ErrorCode.SSH_HOST_KEY_MISMATCH:
+            ElMessage.error('SSH 主机密钥不匹配:可能存在中间人攻击')
+            return
+          case ErrorCode.SSH_TARGET_FORBIDDEN:
+            ElMessage.error('SSH 目标地址被禁止:仅允许配置的网段')
+            return
+          case ErrorCode.SSH_CONNECTION_LIMIT_REACHED:
+            ElMessage.error('SSH 连接数已达上限,请稍后重试')
+            return
+          case ErrorCode.SSH_CONNECTION_FAILED:
+            ElMessage.error('SSH 连接失败:请检查主机端口与可达性')
+            return
+          case ErrorCode.FORBIDDEN:
+            ElMessage.error('无权限:仅管理员可执行 SSH 测试')
+            return
+          case ErrorCode.UNAUTHORIZED:
+            ElMessage.error('未登录或登录已过期')
+            return
+          default:
+            ElMessage.error(error.message || 'SSH 测试失败')
+            return
+        }
+      }
+      ElMessage.error('SSH 测试失败:网络异常')
+    })
 }
 
 async function handleDelete(row: Server): Promise<void> {

@@ -6,6 +6,7 @@ import type {
   Server,
   ServerQuery,
   ServerStatus,
+  SshTestResult,
   UpdateServerRequest
 } from '@/types/api'
 
@@ -76,5 +77,15 @@ export function updateServer(
 export function deleteServer(id: number): Promise<ApiResponse<null>> {
   return apiClient
     .delete<ApiResponse<null>>(`/servers/${id}`)
+    .then((r) => r.data)
+}
+
+/**
+ * 触发目标服务器的 SSH 连接测试(后端 MVP-7 接入)。
+ * 成功:ApiResponse<SshTestResult>;失败抛 ApiBusinessError。
+ */
+export function testSshConnection(id: number): Promise<ApiResponse<SshTestResult>> {
+  return apiClient
+    .post<ApiResponse<SshTestResult>>(`/servers/${id}/ssh/test`)
     .then((r) => r.data)
 }
