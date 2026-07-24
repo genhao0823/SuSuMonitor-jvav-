@@ -102,6 +102,7 @@ npm run dev    # http://127.0.0.1:5173,自动代理 /api → :18080
 | 管理员审核页(通过/拒绝 + 错误码映射) | ✅ | M5 |
 | 路由切换 loading bar(NProgress) | ✅ | UX 打磨 |
 | M6 实时监控页(ticket + WS + REST 历史 + 卡片 + 表) | ✅ | M6 |
+| Sprint 1 SSH 测试按钮接真实后端 | ✅ | Sprint 1 |
 | OpenAPI 结构、引用和 operationId 校验脚本 | ✅ | 自动化 |
 | catch-up 静态审计(audit:catchup,11 条规则 v0.2) | ✅ | 自动化 |
 | HTTP API 自动化测试(api:e2e) | ✅ | 自动化 |
