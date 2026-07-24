@@ -53,7 +53,7 @@
       >
         <DashboardServersCard
           :count="servers.count"
-          :displayed-total="displayedTotal"
+          :data="sparkHistory"
           :loading="loading.servers"
         />
       </el-col>
@@ -105,6 +105,7 @@ import { ElMessage } from 'element-plus'
 import { ApiBusinessError } from '@/api/client'
 import { getHealth, getReady } from '@/api/system'
 import { listServers } from '@/api/server'
+import { getMetricsHistory } from '@/api/metrics'
 import { useAuthStore } from '@/stores/auth'
 import { ErrorCode } from '@/types/error-code'
 import { animateCounter } from '@/utils/animate'
@@ -260,6 +261,43 @@ async function probePendingCount(): Promise<void> {
   }
 }
 
+/**
+ * spark line 数据(7 天 CPU 趋势)。
+ * 由 loadSparkHistory 在 refresh 末尾异步填充。
+ * 失败/无数据时为空数组,ServerSparkLine 渲染空态。
+ */
+const sparkHistory = ref<number[]>([])
+
+/**
+ * 拉取"列表中第一个 server"最近 7 天 CPU 历史。
+ * 选第一个 server 兼顾"代表性" + "避免并发 N 请求"。
+ * 单次拉取,失败降级为 [],不抛错。
+ */
+async function loadSparkHistory(): Promise<void> {
+  try {
+    const detail = await listServers({ page: 1, page_size: 1 })
+    if (!detail.data || detail.data.items.length === 0) {
+      sparkHistory.value = []
+      return
+    }
+    const firstId = detail.data.items[0].id
+    const end = new Date()
+    const start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const r = await getMetricsHistory(
+      firstId,
+      start.toISOString(),
+      end.toISOString(),
+      1,
+      200
+    )
+    sparkHistory.value = r.data.items
+      .map((m) => m.cpu_percent)
+      .filter((v): v is number => v !== null)
+  } catch {
+    sparkHistory.value = []
+  }
+}
+
 async function refresh(): Promise<void> {
   if (refreshing.value) {
     return
@@ -270,6 +308,8 @@ async function refresh(): Promise<void> {
   loading.servers = true
   loading.pending = true
   await Promise.all([probeHealth(), probeReady(), probeServers(), probePendingCount()])
+  // spark line 异步拉取,失败不影响卡片 4 个 KPI
+  void loadSparkHistory()
   refreshing.value = false
 }
 
