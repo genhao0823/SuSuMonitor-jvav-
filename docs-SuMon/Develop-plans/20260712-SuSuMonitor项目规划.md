@@ -2,9 +2,9 @@
 
 **日期**: 2026-07-12  
 **依据**: 根目录 `项目需求与规范.md`  
-**最后核对日期**: 2026-07-21
-**当前实施阶段**: MVP-2 监控采集 Agent
-**当前状态**: 认证与管理员审核已完成本机运行时验收；服务器 CRUD、权限矩阵、软删除、SSH 凭据加密和 SSH 安全连接测试已实现并通过自动化测试；Agent Token 生命周期、Metrics 接收/存储/查询/清理、Monitor Ticket 与实时推送链路已实现并通过定向测试；WebSocket 协议文档已建立；真实 Agent 运行时验收和全量 MySQL 验收未完成。
+**最后核对日期**: 2026-07-23
+**当前实施阶段**: MVP-5A 前端收口；下一业务阶段为 MVP-6 告警闭环
+**当前状态**: MVP-1 核心能力已实现但收口验收未全部完成；MVP-2 Go Agent 与 MVP-3 Metrics/Monitor 实时链路已完成本机运行时验收；MVP-5A 登录、仪表盘、服务器管理、用户审核和实时监控页面已实现。首管理员独立空库真实并发、真实 SSH `50003` 分类、部署环境和多实例能力仍未验证。
 
 当前状态以本节矩阵和最新开发日志为准，后文历史实施顺序不代表当前完成状态。
 
@@ -21,14 +21,15 @@
 | login、me、logout | 已实现 | Service 与 MockMvc 已通过 | admin/user 成功、pending/rejected 403 和 me/logout 已验证 | 未验证 |
 | 管理员审核 | 已实现 | Service 与 MockMvc 已通过 | approve/reject、重复和并发审核已验证 | 未验证 |
 | 服务器 CRUD 与凭据加密 | 已实现 | 单元与 MockMvc 已通过 | HTTP 与当前开发 MySQL 已验证；独立库未验证 | 未验证 |
-| SSH 安全与连接测试 | 已实现 | 已通过 | 已验证 | 未验证 |
-| Agent Token 生命周期(register/rotate/revoke) | 已实现 | 已通过 | 未验证 | 未验证 |
-| Metrics 接收、存储、最新/历史查询 | 已实现 | 已通过 | 未验证 | 未验证 |
+| SSH 安全与连接测试 | 已实现 | 已通过 | password/private_key 真实成功历史已验证；当前受控 WSL 的 `50003` 分类仍未验证 | 未验证 |
+| Agent Token 生命周期(register/rotate/revoke) | 已实现 | 已通过 | 真实 HTTP/Agent 链路已验证 | 未验证 |
+| Metrics 接收、存储、最新/历史查询 | 已实现 | 已通过 | 真实 Agent + MySQL 查询已验证 | 未验证 |
 | Metrics 过期清理(分批/防重叠) | 已实现 | 已通过 | 独立 MySQL 已验证 | 未验证 |
-| Agent WebSocket 鉴权/心跳/上报 | 已实现 | 已通过 | 未验证 | 未验证 |
-| Monitor Ticket + 实时指标推送 | 已实现 | 已通过 | 未验证 | 未验证 |
+| Agent WebSocket 鉴权/心跳/上报 | 已实现 | 已通过 | 真实 Agent 运行时已验证 | 未验证 |
+| Monitor Ticket + 实时指标推送 | 已实现 | 已通过 | 真实 HTTP/WebSocket/MySQL 已验证 | 未验证 |
 | WebSocket 协议文档 | 已建立 | — | — | — |
-| Flyway V8-V9 | 已实现 | 已校验 | 未验证 | 未验证 |
+| Flyway V8-V9 | 已实现 | 已校验 | 隔离 MySQL V1-V9 已验证 | 未验证 |
+| Vue Web M2-M6 | 已实现 | Vitest、ESLint、构建已通过 | 浏览器/UI E2E 历史已验证 | 未验证 |
 
 ## 一、已确认决策
 
@@ -116,12 +117,12 @@ SuSuMonitor/
 
 | 阶段 | 内容 | 当前执行 |
 |------|------|----------|
-| MVP-1 | Java 后端新建、MySQL 建表、JWT 登录注册、用户审核、服务器 CRUD、SSH 凭据加密、SSH 连接测试 | 已完成 |
-| MVP-2 | Agent 指标采集、5 秒采集频率、WebSocket 连接、心跳、注册校验 | 后端鉴权/心跳/上报已实现；正式 Go Agent 待开发 |
+| MVP-1 | Java 后端新建、MySQL 建表、JWT 登录注册、用户审核、服务器 CRUD、SSH 凭据加密、SSH 连接测试 | 核心实现完成；首管理员空库并发、当前 SSH 分类和部署验收未收口 |
+| MVP-2 | Agent 指标采集、5 秒采集频率、WebSocket 连接、心跳、注册校验 | 已实现并完成本机运行时验收 |
 | MVP-3 | 指标接收、MySQL 存储、WebSocket 推送、历史指标查询、10 天数据清理 | 指标接收/存储/查询/实时推送/清理已实现 |
 | MVP-4 | OpenAPI 契约基线收口、lint、Apifox 导入和实现漂移检查 | 随接口同步，阶段性收口 |
-| MVP-5A | 登录、注册、仪表盘、服务器列表和详情前端，直接对接真实 API | 否 |
-| MVP-6 | 告警后端、告警前端和 WebSocket 告警推送 | 否 |
+| MVP-5A | 登录、注册、仪表盘、服务器列表和详情前端，直接对接真实 API | 已实现；告警与 Web SSH 不在本阶段 |
+| MVP-6 | 模块化单体告警业务闭环：规则、状态机去重、记录、查询、已读、恢复和 WebSocket 推送；暂不依赖 RabbitMQ | 否 |
 | MVP-7 | SSH 后端代理、PTY、多会话、20 分钟超时和 xterm.js 前端 | 否 |
 | MVP-8 | 安装、启动、升级、回滚、备份恢复和安全检查文档 | 否 |
 
@@ -131,20 +132,20 @@ SuSuMonitor/
 
 | 阶段 | 内容 | 当前执行 |
 |------|------|----------|
-| MVP-9 | 微服务化准备：模块依赖梳理、数据所有权、通信契约、统一日志和性能基线 | 否 |
-| MVP-10 | `metrics-service`：Agent 指标接收、指标存储、最新/历史查询和清理 | 否 |
-| MVP-11 | `alert-service`：告警规则、告警检测、告警记录和告警推送 | 否 |
+| MVP-9 | 微服务化准备：模块依赖、数据所有权、RabbitMQ 异步边界与版本化消息契约、统一日志和性能基线 | 否 |
+| MVP-10 | `metrics-service`：Agent 指标处理、Outbox 可靠事件发布、指标存储、最新/历史查询和清理 | 否 |
+| MVP-11 | `alert-service`：通过 RabbitMQ 幂等消费指标事件，完成告警检测、状态迁移、记录和推送 | 否 |
 | MVP-12 | `ssh-service`：SSH 连接测试、SSH 会话、PTY、输入输出和超时 | 否 |
 | MVP-13 | Gateway 与服务治理：统一入口、路由、配置管理、服务发现和服务间鉴权 | 否 |
-| MVP-14 | 分布式运行保障：独立部署、链路追踪、集中日志、消息可靠性和回滚 | 否 |
+| MVP-14 | 分布式运行保障：独立部署、链路追踪、集中日志、RabbitMQ 重试/死信/积压治理和回滚 | 否 |
 
 微服务阶段的服务边界初步规划如下：
 
 ```text
 auth-service       -> users
 server-service     -> servers
-metrics-service   -> metrics
-alert-service     -> alert_rules、alert_records
+metrics-service   -> metrics、message_outbox
+alert-service     -> alert_rules、alert_records、alert_states、message_consume_records
 ssh-service       -> ssh_sessions
 ```
 
@@ -152,14 +153,47 @@ ssh-service       -> ssh_sessions
 
 微服务拆分顺序和验收要求：
 
-1. MVP-9 先完成模块依赖、数据所有权、同步/异步通信边界和性能基线；验证模块不直接访问其他模块的 Mapper 和数据表。
-2. MVP-10 优先拆分指标服务；验证指标服务可独立构建、启动、测试和处理 Agent 指标，不直接访问 `users`、`servers` 表。
-3. MVP-11 在指标事件稳定后拆分告警服务；验证事件消费幂等、重复消息不重复生成告警、推送失败可重试或记录。
+1. MVP-9 先完成模块依赖、数据所有权、同步/异步通信边界和性能基线；冻结 RabbitMQ Exchange、Queue、Routing Key、死信队列和 `metrics.reported.v1`、`alert.triggered.v1` 契约，验证模块不直接访问其他模块的 Mapper 和数据表。
+2. MVP-10 优先拆分指标服务；使用 Transactional Outbox 保证 Metrics 与待发布事件在同一 MySQL 事务中提交，通过 Publisher Confirm 和 Return 可靠发布 `metrics.reported.v1`，验证 RabbitMQ 中断时指标不丢失且恢复后可补发。
+3. MVP-11 在指标事件稳定后拆分告警服务；通过 RabbitMQ 消费 `metrics.reported.v1`，验证事件消费幂等、同一规则持续越界不重复生成告警、恢复后标记 `resolved`、再次越界可生成新告警，推送失败可重试或记录。
 4. MVP-12 拆分 SSH 服务；验证凭据加密、服务间鉴权、会话超时、连接上限和异常隔离。
 5. MVP-13 只有在服务数量和独立部署需求明确后再引入 Gateway、服务发现和配置中心；验证路由、超时、鉴权、限流和链路追踪。
-6. MVP-14 完善多服务本地启动、独立健康检查、集中日志、消息重试、死信、部署回滚和集成测试。
+6. MVP-14 完善多服务本地启动、独立健康检查、集中日志、消息重试、死信、积压监控与重放、部署回滚和集成测试。
 
 微服务拆分前必须完成数据库备份、数据校验、回滚方案和流量切换方案。不得只复制多个 Spring Boot 工程而忽略服务数据边界、服务间认证、超时、重试、幂等和最终一致性。
+
+### 五点二、RabbitMQ 分阶段实施规划
+
+RabbitMQ 用于解耦 Metrics 与 Alert，不替代 Agent/Monitor WebSocket、MySQL 查询、心跳或 SSH 交互链路。当前规划采用至少一次投递语义，消费端必须通过全局唯一 `event_id` 实现幂等；消息中禁止包含 JWT、Agent Token、SSH 凭据、数据库密码和 RabbitMQ 密码。
+
+| 阶段 | 实施内容 | 阶段出口条件 |
+|------|----------|--------------|
+| MVP-6 | 先在模块化单体内完成告警规则、状态机去重、恢复、记录、已读和 `alert.push`，使用本地事务事件验证业务规则 | 首次越界生成告警、持续越界不重复、恢复后转为 `resolved`、再次越界生成新告警；RabbitMQ 仍未引入 |
+| MVP-9 | 冻结 `susumonitor.events`、`susumonitor.dlx`、`susumonitor.alert.metrics`、`susumonitor.alert.metrics.dlq` 和版本化事件契约；明确至少一次投递、幂等、重试和不可重试异常边界 | 消息契约、拓扑、数据所有权、兼容策略和故障语义完成文档评审，尚不宣称运行时可用 |
+| MVP-10 | Metrics 与 `message_outbox` 同事务写入；Outbox 发布器使用 Publisher Confirm、Return 和退避重试发送 `metrics.reported.v1` | RabbitMQ 停止时 Metrics 继续落库且 Outbox 保留，Broker 恢复后补发成功；普通单元测试不依赖本机 RabbitMQ |
+| MVP-11 | `alert-service` 幂等消费 `metrics.reported.v1`，匹配规则并维护 `alert_states`、`alert_records` 和消费记录；产生 `alert.triggered.v1` 并发送 `alert.push` | Agent 上报到告警推送的真实链路通过；重复投递不产生重复告警；重试耗尽的消息进入 DLQ |
+| MVP-14 | 增加 Outbox 清理、DLQ 查询与受控重放、队列积压告警、处理耗时与失败率监控、Broker/消费者重启恢复和滚动升级验证 | 消息积压、死信、重放、恢复和回滚均有可执行手册及真实运行时验证记录 |
+
+RabbitMQ 故障策略固定为“存活但未就绪”：`/api/health` 只表示 Java 进程存活；`/api/ready` 同时检查 MySQL 和 RabbitMQ。Broker 不可用时应用不退出，Agent 指标继续写入 MySQL 和 Outbox，但就绪检查失败；Broker 恢复后自动补发积压事件。
+
+RabbitMQ 首批业务拓扑规划如下：
+
+```text
+metrics-service
+    -> message_outbox
+    -> susumonitor.events [metrics.reported.v1]
+    -> susumonitor.alert.metrics
+    -> alert-service
+    -> alert_records / alert_states
+    -> alert.push
+
+susumonitor.alert.metrics
+    -> retry exhausted
+    -> susumonitor.dlx
+    -> susumonitor.alert.metrics.dlq
+```
+
+RabbitMQ 相关验证必须分层记录：单元测试验证事件序列化、规则匹配和幂等逻辑；MySQL 集成测试验证 Metrics 与 Outbox 事务边界；真实 RabbitMQ 集成测试验证拓扑、Confirm、Return、重试和 DLQ；真实 WebSocket 验证 `alert.push`。任一层通过不得替代其他层，也不得在未执行真实 Broker 测试时宣称 RabbitMQ 运行时已验证。
 
 ## 六、MVP-1 完成标准
 
@@ -975,13 +1009,11 @@ servers.delete_token 支持软删除后同 host 重建
 
 建议按以下顺序开始实施：
 
-1. 在独立空测试数据库验证首管理员状态锁的真实 MySQL 并发唯一性。
-2. 实现 JWT 签发、解析、登录和完整 claims 校验。
-3. 实现 Bearer Token 过滤器、默认拒绝安全策略和统一 401/403。
-4. 实现 me、logout 和管理员审核，完成认证闭环验收。
-5. 满足认证阶段出口条件后再实现服务器 CRUD。
-6. 在 SSH 开发前完成主机指纹、出站边界和密钥轮换设计。
-7. 每个接口同步静态 OpenAPI、HTTP 示例、Apifox 验证和开发日志。
+1. 完成 MVP-1 剩余的首管理员独立空库并发和真实 SSH `50003` 分类验收。
+2. 收口 MVP-5A 文档、接口契约和浏览器回归记录。
+3. 实施 MVP-6 模块化单体告警规则、状态机、记录和 `alert.push` 闭环。
+4. MVP-9 冻结 RabbitMQ 消息契约，MVP-10 实现 Outbox 可靠发布，MVP-11 实现告警幂等消费。
+5. 每次修改 REST、WebSocket 或消息契约时同步 OpenAPI、协议、调试样例、测试和开发日志。
 
 ## 二十六、AI 运维中枢规划
 

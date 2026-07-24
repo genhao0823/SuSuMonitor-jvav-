@@ -2,6 +2,7 @@
 import { setActivePinia, createPinia } from 'pinia'
 import * as mockApi from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
+import type { ApiResponse, CurrentUser, LoginResult } from '@/types/api'
 
 // Mock @/api/auth module(閬垮厤鐪熻皟鍚庣)鈥斺€?factory 鍐呰仈,涓嶈兘 hoist 澶栭儴 var
 vi.mock('@/api/auth', () => ({ loginUser: vi.fn(), registerUser: vi.fn(), getCurrentUser: vi.fn(), logoutUser: vi.fn() }))
@@ -58,8 +59,8 @@ describe('auth store', () => {
     vi.mocked(mockApi.loginUser).mockResolvedValueOnce({
       code: 0,
       message: 'success',
-      data: { token: 'jwt-xxx', tokenType: 'Bearer', expiresIn: 86400, user: makeUser({ id: 1, username: 'admin', role: 'admin' }) } as any
-    })
+      data: { token: 'jwt-xxx', tokenType: 'Bearer', expiresIn: 86400, user: makeUser({ id: 1, username: 'admin', role: 'admin' }) }
+    } satisfies ApiResponse<LoginResult>)
 
     const auth = useAuthStore()
     await auth.login({ username: 'admin', password: 'xxx' })
@@ -91,7 +92,7 @@ describe('auth store', () => {
   })
 
   it('logout 娓呯┖ token + user', async () => {
-    vi.mocked(mockApi.logoutUser).mockResolvedValueOnce({ code: 0, message: 'success', data: null } as any)
+    vi.mocked(mockApi.logoutUser).mockResolvedValueOnce({ code: 0, message: 'success', data: null })
     const auth = useAuthStore()
     auth.token = 'fake'
     auth.user = makeUser()
@@ -102,7 +103,11 @@ describe('auth store', () => {
   })
 
   it('refresh 鎴愬姛 鈫?鏇存柊 user', async () => {
-    vi.mocked(mockApi.getCurrentUser).mockResolvedValueOnce({ code: 0, message: 'success', data: makeUser({ username: 'updated' }) } as any)
+    vi.mocked(mockApi.getCurrentUser).mockResolvedValueOnce({
+      code: 0,
+      message: 'success',
+      data: makeUser({ username: 'updated' })
+    } satisfies ApiResponse<CurrentUser>)
 
     const auth = useAuthStore()
     auth.token = 'jwt-xxx'

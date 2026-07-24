@@ -4,7 +4,7 @@
 
 ## check-openapi.mjs
 
-OpenAPI JSON 结构 lint 脚本。
+OpenAPI JSON 契约 lint 与 Java Controller 路径漂移检查脚本。
 
 ### 用法
 
@@ -12,18 +12,22 @@ OpenAPI JSON 结构 lint 脚本。
 npm run openapi:check
 ```
 
-扫描 `docs-SuMon/OpenApi-SuMon/*.json`,对每份契约做 4 项最低线校验:
+扫描 `docs-SuMon/OpenApi-SuMon/*.json` 和 Java Controller，执行以下校验：
 
 1. 顶层必含 `openapi` / `info` / `paths`
 2. `openapi` 版本必须是 `3.0.x`
 3. `info.title` 与 `info.version` 必须非空字符串
 4. `paths` 至少含一条 HTTP 端点(get/post/put/delete/patch/options/head)
+5. 每个 HTTP 操作具有非空且全局唯一的 `operationId`
+6. 每个 HTTP 操作具有非空 `responses`
+7. 所有本地 JSON Pointer `$ref` 均可解析
+8. OpenAPI 与 Java Controller 的 HTTP 方法和路径双向一致
 
 ### 设计原则
 
 - 纯只读:**不会修改任何 JSON 文件**
 - 离线:**不依赖网络**,纯本地文件 IO
-- 零依赖:仅用 Node 内置 `node:fs` / `node:path`,不需要 `npm install`
+- 零依赖:仅用 Node 内置 `node:fs` / `node:path`,不需要额外 npm 包
 - CI 友好:退出码 `0` 全通过,`1` 有失败
 
 ### 输出示例(成功)
@@ -60,11 +64,11 @@ OpenAPI 契约结构校验
 修复契约 JSON → 重新执行 `npm run openapi:check`。
 脚本不修改源文件,所有修复由人/后端工具完成。
 
-### 故意不做的事
+### 当前边界
 
-- **不校验 schemas / components**:业务契约由后端维护
-- **不校验路径格式**:路径风格是 OpenAPI 设计问题,不在 lint 范围
-- **不校验跨文件一致性**:三份 JSON 分属不同模块,跨文件校验通过 Apifox import 验证
+- **不做完整 Schema 语义校验**:当前验证引用存在性，不替代专业 OpenAPI Validator
+- **Controller 漂移检查只覆盖当前使用的简单 Mapping 字符串**:不解析数组路径或组合注解
+- **不比较 DTO/VO 字段与 Schema**:字段级一致性由 Controller 测试、类型检查和运行时验收覆盖
 - **不校验中文/特殊字符**:OpenAPI 3 允许 Unicode
 
 ---
@@ -173,7 +177,7 @@ Catch-up 静态审计
 
 | 工具 | 检查目标 | 检查内容 |
 |---|---|---|
-| `openapi:check` | OpenAPI JSON 文件 | 结构(顶层、version、title、paths) |
+| `openapi:check` | OpenAPI JSON + Java Controller | 结构、引用、operationId 和路径漂移 |
 | `audit:catchup` | 前端 TS/Vue 文件 | 业务(魔法数字、参数名、API 路径、硬编码 host) |
 
 两套互补,共同组成 "API 契约 + 前端用法" 双视角校验。

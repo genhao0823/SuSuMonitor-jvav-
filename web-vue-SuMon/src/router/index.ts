@@ -66,7 +66,7 @@ const protectedChildren: RouteRecordRaw[] = [
     component: () => import('@/views/MetricsView.vue'),
     meta: { title: '服务器监控', requiresAuth: true }
   },
-{
+  {
     path: '/admin/users',
     name: 'admin-users',
     component: () => import('@/views/AdminUsersView.vue'),

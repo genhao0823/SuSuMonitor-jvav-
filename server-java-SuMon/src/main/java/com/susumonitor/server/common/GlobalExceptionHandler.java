@@ -6,7 +6,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -54,6 +56,34 @@ public class GlobalExceptionHandler {
                 .toList();
         LOGGER.warn("Constraint validation failed for paths: {}", invalidPaths);
 
+        ErrorCode errorCode = ErrorCode.INVALID_REQUEST_PARAMETER;
+        return ResponseEntity.status(errorCode.getHttpStatus()).body(ApiResponse.error(errorCode));
+    }
+
+    /**
+     * 将缺失的必填查询参数转换为统一参数错误，不记录请求参数值。
+     *
+     * @param exception 必填查询参数缺失异常
+     * @return 统一参数错误响应
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingServletRequestParameterException(
+            MissingServletRequestParameterException exception) {
+        LOGGER.warn("Required request parameter is missing: {}", exception.getParameterName());
+        ErrorCode errorCode = ErrorCode.INVALID_REQUEST_PARAMETER;
+        return ResponseEntity.status(errorCode.getHttpStatus()).body(ApiResponse.error(errorCode));
+    }
+
+    /**
+     * 将查询参数类型或时间格式转换失败统一映射为参数错误，不记录可能敏感的原始值。
+     *
+     * @param exception 查询参数类型转换异常
+     * @return 统一参数错误响应
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException exception) {
+        LOGGER.warn("Request parameter type conversion failed: {}", exception.getName());
         ErrorCode errorCode = ErrorCode.INVALID_REQUEST_PARAMETER;
         return ResponseEntity.status(errorCode.getHttpStatus()).body(ApiResponse.error(errorCode));
     }
