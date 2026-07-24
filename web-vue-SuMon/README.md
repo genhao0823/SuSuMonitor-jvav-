@@ -105,6 +105,7 @@ npm run dev    # http://127.0.0.1:5173,自动代理 /api → :18080
 | Sprint 1 SSH 测试按钮接真实后端 | ✅ | Sprint 1 |
 | Sprint 2 spark line 接真实历史 | ✅ | Sprint 2 |
 | Sprint 3 Dashboard spark 接真实 + ServerSparkLine 复用 | ✅ | Sprint 3 |
+| Polish 6 LONG_FILE 阈值调高 + CRLF 兼容 | ✅ | Polish 6 |
 | OpenAPI 结构、引用和 operationId 校验脚本 | ✅ | 自动化 |
 | catch-up 静态审计(audit:catchup,11 条规则 v0.2) | ✅ | 自动化 |
 | HTTP API 自动化测试(api:e2e) | ✅ | 自动化 |
