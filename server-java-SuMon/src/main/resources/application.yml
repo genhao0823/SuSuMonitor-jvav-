@@ -1,6 +1,9 @@
 spring:
   application:
     name: ${APP_NAME:susumonitor}
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   profiles:
     active: ${APP_ENV:local}
   datasource:
@@ -30,17 +33,25 @@ mybatis-plus:
 susumonitor:
   jwt:
     secret: ${JWT_SECRET:}
-    expire-hours: ${JWT_EXPIRE_HOURS:24}
+    expire-hours: ${JWT_EXPIRE_HOURS:72}
   security:
     aes-gcm-key: ${AES_GCM_KEY:}
   agent:
     register-key: ${AGENT_REGISTER_KEY:}
   ssh:
     connect-timeout-seconds: ${SSH_CONNECT_TIMEOUT_SECONDS:10}
+    socket-timeout-seconds: ${SSH_SOCKET_TIMEOUT_SECONDS:15}
+    total-timeout-seconds: ${SSH_TOTAL_TIMEOUT_SECONDS:30}
+    max-concurrent-connections: ${SSH_MAX_CONCURRENT_CONNECTIONS:8}
+    max-resolved-addresses: ${SSH_MAX_RESOLVED_ADDRESSES:8}
+    allowed-ports: ${SSH_ALLOWED_PORTS:22}
+    allowed-cidrs: ${SSH_ALLOWED_CIDRS:}
     idle-timeout-minutes: ${SSH_IDLE_TIMEOUT_MINUTES:20}
   metrics:
     retention-days: ${METRICS_RETENTION_DAYS:10}
     cleanup-cron: ${METRICS_CLEANUP_CRON:0 0 3 * * ?}
+    cleanup-batch-size: ${METRICS_CLEANUP_BATCH_SIZE:1000}
+    cleanup-max-batches-per-run: ${METRICS_CLEANUP_MAX_BATCHES_PER_RUN:100}
 
 springdoc:
   api-docs:

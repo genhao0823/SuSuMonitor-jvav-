@@ -4,10 +4,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.OffsetDateTime;
 import lombok.Data;
 
+/**
+ * 返回服务器和 Agent 的数据库状态快照及本次查询时间。
+ */
 // 自动生成当前 VO 的 getter、setter、toString、equals 和 hashCode 方法。
 @Data
 public class ServerStatusVo {
 
+    // 将 Java 的 serverId 属性映射为接口 JSON 字段 server_id。
+    @JsonProperty("server_id")
     private Long serverId;
     private String status;
     // 将 Java 的 agentStatus 属性映射为接口 JSON 字段 agent_status。
@@ -16,6 +21,8 @@ public class ServerStatusVo {
     // 将 Java 的 lastHeartbeatAt 属性映射为接口 JSON 字段 last_heartbeat_at。
     @JsonProperty("last_heartbeat_at")
     private OffsetDateTime lastHeartbeatAt;
+    // 将 Java 的 checkedAt 属性映射为接口 JSON 字段 checked_at。
+    @JsonProperty("checked_at")
     private OffsetDateTime checkedAt;
 
 }

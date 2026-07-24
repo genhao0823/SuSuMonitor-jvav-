@@ -1,0 +1,125 @@
+<template>
+  <div class="metrics-view">
+    <PageHeader
+      :title="`服务器 ${serverId} 监控`"
+      subtitle="固定宽表指标实时与历史数据"
+    >
+      <template #actions>
+        <el-tag :type="metrics.connected ? 'success' : 'warning'">
+          {{ metrics.connected ? '实时连接' : '连接断开' }}
+        </el-tag>
+      </template>
+    </PageHeader>
+    <el-alert
+      v-if="metrics.error"
+      :title="metrics.error"
+      type="error"
+      show-icon
+    />
+    <el-row
+      v-loading="metrics.loading"
+      :gutter="12"
+      class="metric-cards"
+    >
+      <el-col
+        v-for="card in cards"
+        :key="card.label"
+        :xs="12"
+        :sm="8"
+        :md="4"
+      >
+        <el-card shadow="hover">
+          <div class="metric-label">
+            {{ card.label }}
+          </div><strong>{{ card.value }}</strong>
+        </el-card>
+      </el-col>
+    </el-row>
+    <el-card
+      shadow="never"
+      class="history-card"
+    >
+      <template #header>
+        <span>历史采样（{{ metrics.history.length }} 条）</span>
+      </template>
+      <el-table
+        :data="metrics.history"
+        stripe
+      >
+        <el-table-column
+          prop="collected_at"
+          label="采集时间"
+          min-width="190"
+        />
+        <el-table-column
+          prop="cpu_percent"
+          label="CPU %"
+        />
+        <el-table-column
+          prop="memory_percent"
+          label="内存 %"
+        />
+        <el-table-column
+          prop="disk_percent"
+          label="磁盘 %"
+        />
+        <el-table-column
+          prop="load_avg"
+          label="Load"
+        />
+      </el-table>
+      <el-empty
+        v-if="metrics.history.length === 0 && !metrics.loading"
+        description="暂无历史指标"
+      />
+    </el-card>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import PageHeader from '@/components/PageHeader.vue'
+import { useMetricsStore } from '@/stores/metrics'
+import { MonitorWebSocket } from '@/services/websocket'
+
+const route = useRoute()
+const metrics = useMetricsStore()
+const serverId = Number(route.params.serverId)
+let socket: MonitorWebSocket | null = null
+
+const cards = computed(() => [
+  { label: 'CPU', value: format(metrics.latest?.cpu_percent, '%') },
+  { label: '内存', value: format(metrics.latest?.memory_percent, '%') },
+  { label: '磁盘', value: format(metrics.latest?.disk_percent, '%') },
+  { label: 'Load', value: format(metrics.latest?.load_avg, '') },
+  { label: '网络接收', value: format(metrics.latest?.net_rx, ' B') },
+  { label: '网络发送', value: format(metrics.latest?.net_tx, ' B') }
+])
+
+function format(value: number | null | undefined, suffix: string): string {
+  return value === null || value === undefined ? '-' : `${value}${suffix}`
+}
+
+onMounted(() => {
+  const end = new Date()
+  const start = new Date(end.getTime() - 24 * 60 * 60 * 1000)
+  void metrics.load(serverId, start.toISOString(), end.toISOString())
+  socket = new MonitorWebSocket(metrics.applyRealtime, metrics.setConnected)
+  socket.connect(serverId)
+})
+
+onBeforeUnmount(() => {
+  socket?.disconnect()
+  socket = null
+  metrics.reset()
+})
+</script>
+
+<style scoped>
+.metrics-view { max-width: 1200px; margin: 0 auto; }
+.metric-cards { margin: 16px 0; }
+.metric-label { color: var(--el-text-color-secondary); font-size: 13px; margin-bottom: 8px; }
+.metric-cards strong { font-size: 20px; }
+.history-card { margin-top: 16px; }
+</style>

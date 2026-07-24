@@ -28,6 +28,17 @@
         updated_at
     </sql>
 
+    <sql id="SafeUserColumns">
+        id,
+        username,
+        role,
+        review_status,
+        reviewed_by,
+        reviewed_at,
+        created_at,
+        updated_at
+    </sql>
+
     <select id="selectByUsername"
             parameterType="java.lang.String"
             resultMap="UserResultMap">
@@ -39,9 +50,46 @@
 
     <select id="selectPendingUsers" resultMap="UserResultMap">
         SELECT
-        <include refid="UserColumns"/>
+        <include refid="SafeUserColumns"/>
         FROM users
-        WHERE review_status = 'pending'
+        WHERE role = 'user'
+          AND review_status = 'pending'
         ORDER BY created_at ASC, id ASC
+    </select>
+
+    <select id="selectReviewUserById"
+            parameterType="java.lang.Long"
+            resultMap="UserResultMap">
+        SELECT
+        <include refid="SafeUserColumns"/>
+        FROM users
+        WHERE id = #{userId}
+    </select>
+
+    <update id="updateReviewStatus">
+        UPDATE users
+        SET
+            review_status = #{reviewStatus},
+            reviewed_by = #{reviewedBy},
+            reviewed_at = #{reviewedAt}
+        WHERE id = #{userId}
+          AND role = 'user'
+          AND review_status = 'pending'
+    </update>
+
+    <select id="selectAuthenticationUserById"
+            parameterType="java.lang.Long"
+            resultMap="UserResultMap">
+        SELECT
+            id,
+            username,
+            role,
+            review_status,
+            reviewed_by,
+            reviewed_at,
+            created_at,
+            updated_at
+        FROM users
+        WHERE id = #{userId}
     </select>
 </mapper>

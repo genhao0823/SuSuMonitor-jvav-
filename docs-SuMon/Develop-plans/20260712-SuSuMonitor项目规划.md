@@ -2,7 +2,34 @@
 
 **日期**: 2026-07-12  
 **依据**: 根目录 `项目需求与规范.md`  
-**当前状态**: 项目已完成 Java 后端工程骨架初始化。当前以后端 MVP-1 为优先目标，统一使用 `server-java-SuMon/` 作为 Java 后端工程目录，下一步进入横切基础能力实现。
+**最后核对日期**: 2026-07-23
+**当前实施阶段**: MVP-5A 前端收口；下一业务阶段为 MVP-6 告警闭环
+**当前状态**: MVP-1 核心能力已实现但收口验收未全部完成；MVP-2 Go Agent 与 MVP-3 Metrics/Monitor 实时链路已完成本机运行时验收；MVP-5A 登录、仪表盘、服务器管理、用户审核和实时监控页面已实现。首管理员独立空库真实并发、真实 SSH `50003` 分类、部署环境和多实例能力仍未验证。
+
+当前状态以本节矩阵和最新开发日志为准，后文历史实施顺序不代表当前完成状态。
+
+| 能力 | 实现状态 | 测试状态 | 本机运行时 | 部署验证 |
+|------|----------|----------|------------|----------|
+| Java 工程骨架 | 已实现 | 已通过 | 已验证 | 未验证 |
+| 统一响应、错误码和异常处理 | 已实现 | 已通过 | 已验证 | 未验证 |
+| 请求追踪 | 新契约已实现 | 单元与 MockMvc 已通过 | HTTP 已验证 | 未验证 |
+| Flyway V1-V7 | 已实现 | 已校验 | MySQL 8.4 已验证 | 未验证 |
+| 用户注册 | 已实现 | 已通过 | HTTP 已验证 | 未验证 |
+| 首管理员并发安全 | 状态行锁已实现 | 单元测试已通过 | V7 迁移和回填已验证；空库并发未验证 | 未验证 |
+| JWT 配置基础 | 已实现 | 已通过 | 已验证 | 未验证 |
+| JWT 签发、解析和 Bearer 鉴权 | 已实现 | 单元与 MockMvc 已通过 | 真实 HS256 Token、Claims、me/logout 已验证 | 未验证 |
+| login、me、logout | 已实现 | Service 与 MockMvc 已通过 | admin/user 成功、pending/rejected 403 和 me/logout 已验证 | 未验证 |
+| 管理员审核 | 已实现 | Service 与 MockMvc 已通过 | approve/reject、重复和并发审核已验证 | 未验证 |
+| 服务器 CRUD 与凭据加密 | 已实现 | 单元与 MockMvc 已通过 | HTTP 与当前开发 MySQL 已验证；独立库未验证 | 未验证 |
+| SSH 安全与连接测试 | 已实现 | 已通过 | password/private_key 真实成功历史已验证；当前受控 WSL 的 `50003` 分类仍未验证 | 未验证 |
+| Agent Token 生命周期(register/rotate/revoke) | 已实现 | 已通过 | 真实 HTTP/Agent 链路已验证 | 未验证 |
+| Metrics 接收、存储、最新/历史查询 | 已实现 | 已通过 | 真实 Agent + MySQL 查询已验证 | 未验证 |
+| Metrics 过期清理(分批/防重叠) | 已实现 | 已通过 | 独立 MySQL 已验证 | 未验证 |
+| Agent WebSocket 鉴权/心跳/上报 | 已实现 | 已通过 | 真实 Agent 运行时已验证 | 未验证 |
+| Monitor Ticket + 实时指标推送 | 已实现 | 已通过 | 真实 HTTP/WebSocket/MySQL 已验证 | 未验证 |
+| WebSocket 协议文档 | 已建立 | — | — | — |
+| Flyway V8-V9 | 已实现 | 已校验 | 隔离 MySQL V1-V9 已验证 | 未验证 |
+| Vue Web M2-M6 | 已实现 | Vitest、ESLint、构建已通过 | 浏览器/UI E2E 历史已验证 | 未验证 |
 
 ## 一、已确认决策
 
@@ -21,16 +48,20 @@
 | Git remote 名称 | `backup` |
 | opencode skill | 只保留 `.opencode/skills`，不保留 `.codex` |
 | skill 语言边界 | 保留与 Go 无关内容，Java 后端遵循 Spring Boot 与阿里巴巴 Java 规范 |
+| 首管理员并发安全 | 使用认证初始化状态记录和数据库事务锁保证原子性 |
+| 请求追踪 | `X-Request-ID` 由服务端生成；客户端使用受限 `X-Correlation-ID` |
+| OpenAPI 权威源 | `docs-SuMon/OpenApi-SuMon/*.json` 为唯一正式契约 |
 
 ## 二、规划原则
 
 - 先完成 MVP-1 Java 后端基础闭环，再进入 Agent、实时指标、Web 前端、告警和 Web SSH 终端。
 - 当前本机开发使用 MySQL 8.4，数据库地址为 `127.0.0.1:3306`，数据库名为 `susumonitor`。
-- REST API 必须保持统一响应结构、统一错误码和 `X-Request-ID` 规范。
+- REST API 必须保持统一响应结构、统一错误码和请求追踪规范。
+- `X-Request-ID` 始终由服务端生成；客户端关联请求使用长度和字符受限的 `X-Correlation-ID`。
 - 密码、JWT、SSH 密码、SSH 私钥、AES 密钥等敏感信息不得明文存储或输出到日志。
 - SQL 查询禁止使用 `SELECT *`，需要明确字段。
 - 数据库结构通过 Flyway 管理，脚本目录只承担本机初始化和辅助职责。
-- 新增或修改 API 时同步维护 OpenAPI 文档和 API 调试文件。
+- 静态 OpenAPI JSON 是唯一正式接口契约；新增或修改 API 时先更新契约，再同步实现、测试和 API 调试文件。
 - 开发活动完成后记录开发日志。
 
 ## 三、目标根目录结构
@@ -86,14 +117,14 @@ SuSuMonitor/
 
 | 阶段 | 内容 | 当前执行 |
 |------|------|----------|
-| MVP-1 | Java 后端新建、MySQL 建表、JWT 登录注册、用户审核、服务器 CRUD、SSH 凭据加密、SSH 连接测试 | 是 |
-| MVP-2 | Agent 指标采集、5 秒采集频率、WebSocket 连接、心跳、注册校验 | 否 |
-| MVP-3 | 指标接收、MySQL 存储、WebSocket 推送、历史指标查询、10 天数据清理 | 否 |
-| MVP-4 | 补全、校验和整理 OpenAPI 文档 | 随接口同步，阶段性收口 |
-| MVP-5 | Vue Web 前端，直接对接真实 API | 否 |
-| MVP-6 | 告警规则、告警记录、WebSocket 告警推送 | 否 |
-| MVP-7 | Web SSH 终端、中心服务器 SSH 代理、PTY、多会话、20 分钟超时 | 否 |
-| MVP-8 | 后端启动、Agent 安装、Web 启动说明 | 否 |
+| MVP-1 | Java 后端新建、MySQL 建表、JWT 登录注册、用户审核、服务器 CRUD、SSH 凭据加密、SSH 连接测试 | 核心实现完成；首管理员空库并发、当前 SSH 分类和部署验收未收口 |
+| MVP-2 | Agent 指标采集、5 秒采集频率、WebSocket 连接、心跳、注册校验 | 已实现并完成本机运行时验收 |
+| MVP-3 | 指标接收、MySQL 存储、WebSocket 推送、历史指标查询、10 天数据清理 | 指标接收/存储/查询/实时推送/清理已实现 |
+| MVP-4 | OpenAPI 契约基线收口、lint、Apifox 导入和实现漂移检查 | 随接口同步，阶段性收口 |
+| MVP-5A | 登录、注册、仪表盘、服务器列表和详情前端，直接对接真实 API | 已实现；告警与 Web SSH 不在本阶段 |
+| MVP-6 | 模块化单体告警业务闭环：规则、状态机去重、记录、查询、已读、恢复和 WebSocket 推送；暂不依赖 RabbitMQ | 否 |
+| MVP-7 | SSH 后端代理、PTY、多会话、20 分钟超时和 xterm.js 前端 | 否 |
+| MVP-8 | 安装、启动、升级、回滚、备份恢复和安全检查文档 | 否 |
 
 当前 MVP-1 至 MVP-8 默认采用模块化单体架构。微服务只作为 MVP-8 之后的增强路线，不改变当前 MVP-1 的开发顺序，也不作为本机调试前置依赖。
 
@@ -101,20 +132,20 @@ SuSuMonitor/
 
 | 阶段 | 内容 | 当前执行 |
 |------|------|----------|
-| MVP-9 | 微服务化准备：模块依赖梳理、数据所有权、通信契约、统一日志和性能基线 | 否 |
-| MVP-10 | `metrics-service`：Agent 指标接收、指标存储、最新/历史查询和清理 | 否 |
-| MVP-11 | `alert-service`：告警规则、告警检测、告警记录和告警推送 | 否 |
+| MVP-9 | 微服务化准备：模块依赖、数据所有权、RabbitMQ 异步边界与版本化消息契约、统一日志和性能基线 | 否 |
+| MVP-10 | `metrics-service`：Agent 指标处理、Outbox 可靠事件发布、指标存储、最新/历史查询和清理 | 否 |
+| MVP-11 | `alert-service`：通过 RabbitMQ 幂等消费指标事件，完成告警检测、状态迁移、记录和推送 | 否 |
 | MVP-12 | `ssh-service`：SSH 连接测试、SSH 会话、PTY、输入输出和超时 | 否 |
 | MVP-13 | Gateway 与服务治理：统一入口、路由、配置管理、服务发现和服务间鉴权 | 否 |
-| MVP-14 | 分布式运行保障：独立部署、链路追踪、集中日志、消息可靠性和回滚 | 否 |
+| MVP-14 | 分布式运行保障：独立部署、链路追踪、集中日志、RabbitMQ 重试/死信/积压治理和回滚 | 否 |
 
 微服务阶段的服务边界初步规划如下：
 
 ```text
 auth-service       -> users
 server-service     -> servers
-metrics-service   -> metrics
-alert-service     -> alert_rules、alert_records
+metrics-service   -> metrics、message_outbox
+alert-service     -> alert_rules、alert_records、alert_states、message_consume_records
 ssh-service       -> ssh_sessions
 ```
 
@@ -122,14 +153,47 @@ ssh-service       -> ssh_sessions
 
 微服务拆分顺序和验收要求：
 
-1. MVP-9 先完成模块依赖、数据所有权、同步/异步通信边界和性能基线；验证模块不直接访问其他模块的 Mapper 和数据表。
-2. MVP-10 优先拆分指标服务；验证指标服务可独立构建、启动、测试和处理 Agent 指标，不直接访问 `users`、`servers` 表。
-3. MVP-11 在指标事件稳定后拆分告警服务；验证事件消费幂等、重复消息不重复生成告警、推送失败可重试或记录。
+1. MVP-9 先完成模块依赖、数据所有权、同步/异步通信边界和性能基线；冻结 RabbitMQ Exchange、Queue、Routing Key、死信队列和 `metrics.reported.v1`、`alert.triggered.v1` 契约，验证模块不直接访问其他模块的 Mapper 和数据表。
+2. MVP-10 优先拆分指标服务；使用 Transactional Outbox 保证 Metrics 与待发布事件在同一 MySQL 事务中提交，通过 Publisher Confirm 和 Return 可靠发布 `metrics.reported.v1`，验证 RabbitMQ 中断时指标不丢失且恢复后可补发。
+3. MVP-11 在指标事件稳定后拆分告警服务；通过 RabbitMQ 消费 `metrics.reported.v1`，验证事件消费幂等、同一规则持续越界不重复生成告警、恢复后标记 `resolved`、再次越界可生成新告警，推送失败可重试或记录。
 4. MVP-12 拆分 SSH 服务；验证凭据加密、服务间鉴权、会话超时、连接上限和异常隔离。
 5. MVP-13 只有在服务数量和独立部署需求明确后再引入 Gateway、服务发现和配置中心；验证路由、超时、鉴权、限流和链路追踪。
-6. MVP-14 完善多服务本地启动、独立健康检查、集中日志、消息重试、死信、部署回滚和集成测试。
+6. MVP-14 完善多服务本地启动、独立健康检查、集中日志、消息重试、死信、积压监控与重放、部署回滚和集成测试。
 
 微服务拆分前必须完成数据库备份、数据校验、回滚方案和流量切换方案。不得只复制多个 Spring Boot 工程而忽略服务数据边界、服务间认证、超时、重试、幂等和最终一致性。
+
+### 五点二、RabbitMQ 分阶段实施规划
+
+RabbitMQ 用于解耦 Metrics 与 Alert，不替代 Agent/Monitor WebSocket、MySQL 查询、心跳或 SSH 交互链路。当前规划采用至少一次投递语义，消费端必须通过全局唯一 `event_id` 实现幂等；消息中禁止包含 JWT、Agent Token、SSH 凭据、数据库密码和 RabbitMQ 密码。
+
+| 阶段 | 实施内容 | 阶段出口条件 |
+|------|----------|--------------|
+| MVP-6 | 先在模块化单体内完成告警规则、状态机去重、恢复、记录、已读和 `alert.push`，使用本地事务事件验证业务规则 | 首次越界生成告警、持续越界不重复、恢复后转为 `resolved`、再次越界生成新告警；RabbitMQ 仍未引入 |
+| MVP-9 | 冻结 `susumonitor.events`、`susumonitor.dlx`、`susumonitor.alert.metrics`、`susumonitor.alert.metrics.dlq` 和版本化事件契约；明确至少一次投递、幂等、重试和不可重试异常边界 | 消息契约、拓扑、数据所有权、兼容策略和故障语义完成文档评审，尚不宣称运行时可用 |
+| MVP-10 | Metrics 与 `message_outbox` 同事务写入；Outbox 发布器使用 Publisher Confirm、Return 和退避重试发送 `metrics.reported.v1` | RabbitMQ 停止时 Metrics 继续落库且 Outbox 保留，Broker 恢复后补发成功；普通单元测试不依赖本机 RabbitMQ |
+| MVP-11 | `alert-service` 幂等消费 `metrics.reported.v1`，匹配规则并维护 `alert_states`、`alert_records` 和消费记录；产生 `alert.triggered.v1` 并发送 `alert.push` | Agent 上报到告警推送的真实链路通过；重复投递不产生重复告警；重试耗尽的消息进入 DLQ |
+| MVP-14 | 增加 Outbox 清理、DLQ 查询与受控重放、队列积压告警、处理耗时与失败率监控、Broker/消费者重启恢复和滚动升级验证 | 消息积压、死信、重放、恢复和回滚均有可执行手册及真实运行时验证记录 |
+
+RabbitMQ 故障策略固定为“存活但未就绪”：`/api/health` 只表示 Java 进程存活；`/api/ready` 同时检查 MySQL 和 RabbitMQ。Broker 不可用时应用不退出，Agent 指标继续写入 MySQL 和 Outbox，但就绪检查失败；Broker 恢复后自动补发积压事件。
+
+RabbitMQ 首批业务拓扑规划如下：
+
+```text
+metrics-service
+    -> message_outbox
+    -> susumonitor.events [metrics.reported.v1]
+    -> susumonitor.alert.metrics
+    -> alert-service
+    -> alert_records / alert_states
+    -> alert.push
+
+susumonitor.alert.metrics
+    -> retry exhausted
+    -> susumonitor.dlx
+    -> susumonitor.alert.metrics.dlq
+```
+
+RabbitMQ 相关验证必须分层记录：单元测试验证事件序列化、规则匹配和幂等逻辑；MySQL 集成测试验证 Metrics 与 Outbox 事务边界；真实 RabbitMQ 集成测试验证拓扑、Confirm、Return、重试和 DLQ；真实 WebSocket 验证 `alert.push`。任一层通过不得替代其他层，也不得在未执行真实 Broker 测试时宣称 RabbitMQ 运行时已验证。
 
 ## 六、MVP-1 完成标准
 
@@ -139,8 +203,10 @@ ssh-service       -> ssh_sessions
 - `/api/health` 和 `/api/ready` 可调用。
 - 所有 REST API 返回统一 JSON 响应结构。
 - 每个 HTTP 请求生成 `request_id`，响应 header 返回 `X-Request-ID`，日志记录 request_id。
+- 客户端可选传入合法 `X-Correlation-ID`；服务端忽略客户端伪造的 `X-Request-ID`。
 - 用户注册、登录、退出、当前用户、管理员审核流程可用。
 - 首个用户自动成为 `admin/approved`。
+- 首管理员初始化必须通过数据库事务锁保证原子性，空库并发注册后管理员数量严格为 1。
 - 后续注册用户默认为 `user/pending`，审核通过后才能登录。
 - 服务器 CRUD 可用，删除为软删除。
 - 服务器新增、修改、删除和 SSH 测试仅允许 `admin`。
@@ -150,6 +216,7 @@ ssh-service       -> ssh_sessions
 - SSH 连接测试接口可用，并使用统一错误响应。
 - 定时任务框架和 metrics 清理任务骨架存在。
 - API 调试文件和 OpenAPI 文档与已实现接口同步。
+- 静态 OpenAPI JSON 通过语义校验并完成 Apifox 导入验证。
 
 ## 七、Java 后端工程结构
 
@@ -495,6 +562,30 @@ MVP-1 接口范围：
 | pending/rejected 用户 | 登录返回 403 |
 | logout | MVP 阶段服务端无状态退出，前端删除 Token |
 
+首管理员原子性规则：
+
+1. 新增单行认证初始化状态记录，并通过 `SELECT ... FOR UPDATE` 在事务内串行化首次管理员判断。
+2. 迁移初始化状态时必须兼容已有 `admin/approved` 用户，禁止迁移后再次产生首管理员。
+3. 用户插入和初始化状态更新必须在同一事务中提交或回滚。
+4. 空测试数据库中两个不同用户名并发注册后，`admin/approved` 数量必须严格等于 1，另一个用户必须为 `user/pending`。
+5. 不再使用 `users` 表计数作为首管理员的最终判断依据。
+
+JWT 契约：
+
+| 项 | 规则 |
+|----|------|
+| 算法 | 固定 HS256 |
+| `iss` | `susumonitor` |
+| `aud` | `susumonitor-api` |
+| `sub` | 用户 ID 字符串 |
+| 自定义声明 | `username` |
+| 时间声明 | `iat`、`exp`，允许 30 秒时钟偏差 |
+| Token ID | UUID 格式 `jti` |
+| 授权依据 | 每个受保护请求查询数据库最新角色和审核状态 |
+| 传输位置 | 仅 `Authorization: Bearer <token>` |
+
+无状态 logout 只要求客户端删除 Token，服务端不维护黑名单。用户不存在、审核状态不是 `approved` 或角色非法时，旧 Token 必须立即返回 `40100`。
+
 角色：
 
 ```text
@@ -549,8 +640,17 @@ AES-GCM 规则：
 | 算法 | AES-256-GCM |
 | IV | 每次加密随机生成 |
 | 密钥来源 | `AES_GCM_KEY` |
-| 存储格式 | 建议 `base64(iv):base64(ciphertext)` |
+| 存储格式 | `v1:key-id:base64(iv):base64(ciphertext-with-tag)` |
 | 日志 | 不输出明文、密文、密钥 |
+
+AES-GCM 的 AAD 至少绑定 `server_id` 和 `credential_type`。SSH 阶段必须规划 key ID、密钥轮换、旧数据重加密、密钥丢失恢复和数据库备份与密钥分离。
+
+SSH 主机身份和出站边界：
+
+- 默认严格校验已登记的主机公钥指纹，禁止接受任意主机密钥。
+- 未知指纹或指纹变化时拒绝连接，重新确认仅允许 `admin` 执行并记录审计。
+- DNS 解析后必须校验目标 IP，限制禁止网段、端口、连接超时、握手超时和并发数。
+- `local` Profile 可显式允许本机地址，部署环境不得默认继承本机规则。
 
 SSH 连接测试接口：
 
@@ -785,6 +885,21 @@ scripts/
 | approve | admin 可审核通过 |
 | reject | admin 可拒绝 |
 
+阶段 5 出口条件：
+
+| 条件 | 验收 |
+|------|------|
+| 首管理员原子性 | 空库并发两个不同用户名，管理员数量严格为 1 |
+| JWT 完整验证 | 固定算法并校验签名、issuer、audience、subject 和过期时间 |
+| 用户状态回查 | 状态或角色变化后旧 Token 权限立即变化 |
+| Security 默认拒绝 | 移除 `anyRequest().permitAll()`，只保留明确公开白名单 |
+| 统一 401/403 | 返回统一 JSON，并包含服务端 `X-Request-ID` |
+| 管理员权限 | 普通用户访问 `/api/admin/**` 返回 `40300` |
+| 日志安全 | 密码、Token 和密钥不进入日志或异常响应 |
+| 正式契约 | 静态 OpenAPI 与实现一致并完成 Apifox 导入验证 |
+
+未满足阶段 5 出口条件前，不进入服务器 CRUD。
+
 ### 阶段 6：服务器管理
 
 目标：服务器 CRUD 闭环。
@@ -809,6 +924,9 @@ scripts/
 | SSH test | 仅 admin，支持 password/private_key |
 | 错误处理 | 失败返回 `50002` |
 | 日志脱敏 | 不输出敏感字段 |
+| 主机身份验证 | 严格校验已登记指纹，禁止接受任意主机密钥 |
+| 出站访问边界 | 防 DNS rebinding，限制目标地址、端口、超时和并发 |
+| 密钥轮换 | 密文包含版本和 key ID，具备重加密规划 |
 
 ### 阶段 8：MVP-1 收口
 
@@ -825,7 +943,7 @@ scripts/
 
 ## 二十三、验证命令和验收流程
 
-后续实现完成后至少验证：
+后续实现完成后至少按验证层级分别记录，单元测试、MockMvc、MySQL 集成测试、本机运行时、Apifox 和部署验证不得互相替代：
 
 ```bash
 mvn test
@@ -880,6 +998,9 @@ servers.delete_token 支持软删除后同 host 重建
 | 当前存在旧目录 `server-susumonitor/` | 可能混淆后端目录 | 备份后删除，统一使用 `server-java-SuMon/` |
 | 本机 MySQL 用户和权限未确认 | `/api/ready` 和 Flyway 可能失败 | 先执行或检查 `scripts/local-mysql-init.sql` |
 | 本机 SSH 服务未确认 | SSH test 可能无法成功验证 | 先完成接口和错误处理，真实成功测试依赖可用 SSH 服务 |
+| 首管理员判断并发竞态 | 可能产生多个管理员 | 使用初始化状态记录和数据库事务锁，并执行真实 MySQL 并发测试 |
+| SSH 主机指纹未校验 | 可能遭受中间人攻击 | 默认严格指纹校验，未知或变化指纹拒绝连接 |
+| SSH 出站边界缺失 | 可能形成 SSRF 或访问敏感地址 | DNS 解析后校验 IP，配置网段、端口、超时和并发限制 |
 | AES-GCM 密钥来源不当 | 凭据加密不安全 | 只从配置或环境变量注入，不硬编码 |
 | 普通用户误操作服务器 | 影响服务器资产安全 | 增删改删和 SSH test 仅 admin |
 | 软删除唯一索引设计不当 | 同 host 删除后无法重建 | 使用 `delete_token` 参与唯一索引 |
@@ -888,461 +1009,15 @@ servers.delete_token 支持软删除后同 host 重建
 
 建议按以下顺序开始实施：
 
-1. 实现 `/api/health`、`/api/ready`、统一响应、错误码、request_id 和日志。
-2. 补齐 Flyway 迁移目录和基础表结构。
-3. 实现认证、审核、服务器 CRUD、SSH 凭据加密和 SSH 测试。
-4. 同步 OpenAPI、HTTP 调试文件、README、本机开发环境文档和开发日志。
+1. 完成 MVP-1 剩余的首管理员独立空库并发和真实 SSH `50003` 分类验收。
+2. 收口 MVP-5A 文档、接口契约和浏览器回归记录。
+3. 实施 MVP-6 模块化单体告警规则、状态机、记录和 `alert.push` 闭环。
+4. MVP-9 冻结 RabbitMQ 消息契约，MVP-10 实现 Outbox 可靠发布，MVP-11 实现告警幂等消费。
+5. 每次修改 REST、WebSocket 或消息契约时同步 OpenAPI、协议、调试样例、测试和开发日志。
 
 ## 二十六、AI 运维中枢规划
 
-### 26.1 能力定位
-
-后续在中心主机接入能力较强的 AI API Key，将 SuSuMonitor 扩展为带 AI 决策能力的多主机监控与自动运维平台。
-
-目标能力：
-
-- 持续收集本机和其他主机的硬件、系统、服务状态。
-- 由 AI 综合判断所有主机的健康状态、异常风险和可能原因。
-- AI 生成结构化处置建议。
-- 低风险操作可按配置自动执行。
-- 中高风险操作推送到 Android 客户端请求人工确认。
-- 所有 AI 建议、审批、执行和结果都记录审计日志。
-
-AI 能力不纳入 MVP-1 主线。MVP-1 仍优先完成 Java 后端基础、用户权限、服务器管理、SSH 凭据安全存储和基础接口。
-
-### 26.2 总体架构
-
-```text
-Web 前端 / Android 客户端
-        ↓
-server-java-SuMon 中心服务
-        ↓
-AI 运维决策模块 aiops
-        ↓
-Agent / SSH / 命令执行通道
-        ↓
-本机和其他 Linux 主机
-```
-
-新增后端模块建议：
-
-```text
-server-java-SuMon/src/main/java/com/susumonitor/server/module/aiops/
-├── controller/
-├── service/
-├── mapper/
-├── entity/
-├── dto/
-└── vo/
-```
-
-可配套新增通知模块：
-
-```text
-server-java-SuMon/src/main/java/com/susumonitor/server/notification/
-├── NotificationService.java
-├── WebSocketNotificationSender.java
-└── PushNotificationSender.java
-```
-
-第一版通知可优先使用 WebSocket，后续再接入 FCM 或国内厂商推送。
-
-### 26.3 AI API Key 管理
-
-AI API Key 只保存在中心主机，不下发给 Agent，不返回给 Web 或 Android。
-
-建议配置项：
-
-```text
-AI_PROVIDER=openai
-AI_API_KEY=本机环境变量
-AI_MODEL=强模型名称
-AI_REQUEST_TIMEOUT_SECONDS=60
-AI_MAX_TOKENS=4096
-AI_OPS_ENABLED=true
-```
-
-安全要求：
-
-- AI API Key 不写入 Git。
-- AI API Key 不写入日志。
-- AI API Key 不返回给前端或 Android。
-- AI API Key 不传给其他主机 Agent。
-- AI 调用日志只保存模型名、请求摘要、结果摘要、耗时和状态，不保存密钥。
-
-### 26.4 AI 分析流程
-
-```text
-定时任务或用户手动触发
-        ↓
-拉取最近 N 分钟所有主机指标、告警、Agent 状态和服务状态
-        ↓
-聚合为 AI 分析上下文
-        ↓
-调用 AI 模型
-        ↓
-AI 返回结构化 JSON
-        ↓
-后端校验 JSON、动作白名单、风险等级和权限策略
-        ↓
-生成 AI 分析报告和建议操作
-        ↓
-按风险等级自动执行、等待审批或直接拒绝
-```
-
-AI 返回结果必须是结构化 JSON，不能直接执行自由文本命令。
-
-示例结构：
-
-```json
-{
-  "summary": "当前整体状态",
-  "overall_status": "healthy|warning|critical",
-  "hosts": [
-    {
-      "server_id": 1,
-      "status": "warning",
-      "problems": ["CPU 使用率持续过高"],
-      "possible_causes": ["某进程占用异常"],
-      "recommended_actions": [
-        {
-          "action": "inspect_top_processes",
-          "risk_level": "L1",
-          "need_approval": false,
-          "reason": "需要查看进程占用"
-        }
-      ]
-    }
-  ]
-}
-```
-
-后端必须校验：
-
-- JSON 格式是否合法。
-- `action` 是否在动作白名单中。
-- `risk_level` 是否符合系统策略。
-- 当前系统是否允许 AI 操作。
-- 当前主机是否允许 AI 操作。
-- 是否需要 Android 或 Web 人工确认。
-
-### 26.5 风险等级与执行策略
-
-| 风险等级 | 类型 | 示例 | 处理方式 |
-|----------|------|------|----------|
-| L1 | 只读分析 | 查看指标、查看进程列表、查看磁盘使用 | 自动执行 |
-| L2 | 低风险操作 | 重启 Agent、刷新状态、清理临时缓存 | 可配置自动执行 |
-| L3 | 中风险操作 | 重启业务服务、清理较大日志、修改非核心配置 | 推送 Android 请求人工确认 |
-| L4 | 高风险操作 | 重启主机、关机、修改防火墙、修改 SSH 配置 | 推送 Android 请求人工确认，默认更严格 |
-| L5 | 禁止操作 | 删除系统目录、格式化磁盘、清空数据库、关闭安全组件 | 永久禁止，不进入确认流程 |
-
-默认策略：
-
-- L1 自动执行。
-- L2 默认不自动执行，可通过配置开启。
-- L3/L4 必须人工确认。
-- L5 直接拒绝。
-
-### 26.6 动作白名单
-
-AI 不允许直接生成 shell 命令并执行，只允许返回系统预定义动作。
-
-| action | 风险等级 | 是否需要 Android 确认 |
-|--------|----------|------------------------|
-| `inspect_top_processes` | L1 | 否 |
-| `inspect_disk_usage` | L1 | 否 |
-| `inspect_memory_usage` | L1 | 否 |
-| `inspect_service_status` | L1 | 否 |
-| `restart_agent` | L2 | 可配置 |
-| `cleanup_temp_files` | L2 | 可配置 |
-| `restart_service` | L3 | 是 |
-| `cleanup_large_logs` | L3 | 是 |
-| `reload_nginx` | L3 | 是 |
-| `reboot_server` | L4 | 是 |
-| `shutdown_server` | L4 | 是 |
-| `change_firewall_rule` | L4 | 是 |
-| `modify_ssh_config` | L4 | 是 |
-| `delete_directory` | L5 | 禁止 |
-| `format_disk` | L5 | 禁止 |
-| `drop_database` | L5 | 禁止 |
-
-错误做法：
-
-```text
-AI 返回 rm -rf /xxx，然后系统执行
-```
-
-正确做法：
-
-```text
-AI 返回 action=cleanup_temp_files
-后端检查 action 白名单
-后端检查风险等级
-后端检查审批策略
-后端调用 Agent 或 SSH 通道执行预定义逻辑
-```
-
-### 26.7 Android 中高风险审批流程
-
-中高风险操作需要发送到 Android 客户端请求人工确认。
-
-流程：
-
-```text
-AI 发现问题并生成建议操作
-        ↓
-后端校验为 L3/L4 操作
-        ↓
-创建 ai_action_record 和审批记录
-        ↓
-推送通知到 Android 客户端
-        ↓
-用户打开操作详情页
-        ↓
-查看风险等级、主机、问题、AI 原因、影响范围和超时时间
-        ↓
-用户同意或拒绝
-        ↓
-后端再次校验用户身份、admin 权限、操作状态和过期时间
-        ↓
-执行或取消操作
-        ↓
-记录审批日志和执行结果
-```
-
-Android 通知内容建议：
-
-| 内容 | 示例 |
-|------|------|
-| 风险等级 | L3 中风险 |
-| 主机 | `SERVER_IP_OR_DOMAIN` / 主机名称 |
-| 问题 | 内存使用率持续超过 90% |
-| AI 建议 | 重启指定服务 |
-| 操作类型 | `restart_service` |
-| 影响范围 | 可能导致服务短暂不可用 |
-| 超时时间 | 10 分钟内未确认则自动取消 |
-| 操作按钮 | 同意 / 拒绝 |
-
-Android 确认不能只依赖通知按钮直接执行，必须进入详情页后确认。
-
-对于 L4 高风险操作，建议增加二次确认，例如输入主机名或输入 `CONFIRM`。
-
-### 26.8 审批状态机
-
-正常流程：
-
-```text
-created
-  ↓
-pending_approval
-  ↓ approve
-approved
-  ↓
-running
-  ↓
-success / failed
-```
-
-拒绝流程：
-
-```text
-pending_approval
-  ↓ reject
-rejected
-```
-
-超时流程：
-
-```text
-pending_approval
-  ↓ timeout
-expired
-```
-
-取消流程：
-
-```text
-pending_approval
-  ↓ cancel
-canceled
-```
-
-执行前必须再次校验：
-
-- action 仍在白名单。
-- 风险等级未被篡改。
-- 审批人仍是 `admin`。
-- 主机仍存在且未软删除。
-- 操作未过期。
-- 操作没有被重复执行。
-- 当前系统未开启全局只读模式。
-- 目标主机未禁用 AI 操作。
-
-### 26.9 AI 运维接口规划
-
-后续建议新增接口：
-
-| 接口 | 作用 | 权限 |
-|------|------|------|
-| `POST /api/aiops/analyze` | 手动触发 AI 分析 | admin |
-| `GET /api/aiops/reports` | 查询 AI 分析报告 | approved user / admin |
-| `GET /api/aiops/reports/{id}` | 查询 AI 分析报告详情 | approved user / admin |
-| `GET /api/aiops/actions/pending` | 查询待确认操作 | admin |
-| `GET /api/aiops/actions/{id}` | 查询操作详情 | admin |
-| `POST /api/aiops/actions/{id}/approve` | 同意执行 | admin |
-| `POST /api/aiops/actions/{id}/reject` | 拒绝执行 | admin |
-| `POST /api/aiops/actions/{id}/cancel` | 取消待执行操作 | admin |
-| `GET /api/aiops/actions/history` | 查询历史操作 | admin |
-
-Android 使用同一套 REST API，不单独设计另一套权限系统。
-
-### 26.10 AI 运维数据表规划
-
-后续建议新增表：
-
-```text
-ai_analysis_reports
-ai_action_records
-ai_action_approvals
-ai_notification_records
-ai_model_call_logs
-```
-
-`ai_analysis_reports` 用于保存 AI 分析报告。
-
-| 字段 | 说明 |
-|------|------|
-| `id` | 主键 |
-| `overall_status` | healthy / warning / critical |
-| `summary` | AI 总结 |
-| `report_json` | 结构化分析结果 |
-| `created_at` | 创建时间 |
-
-`ai_action_records` 用于保存 AI 建议或执行的操作。
-
-| 字段 | 说明 |
-|------|------|
-| `id` | 操作记录 ID |
-| `server_id` | 主机 ID |
-| `action_type` | 动作类型 |
-| `risk_level` | L1/L2/L3/L4/L5 |
-| `status` | pending_approval / approved / rejected / running / success / failed / canceled / expired |
-| `reason` | AI 判断原因 |
-| `impact` | 影响说明 |
-| `requested_by` | ai / user |
-| `approved_by` | 审批人 |
-| `approved_at` | 审批时间 |
-| `expires_at` | 确认超时时间 |
-| `executed_at` | 执行时间 |
-| `result_summary` | 执行结果摘要 |
-| `created_at` | 创建时间 |
-
-`ai_action_approvals` 用于保存审批记录。
-
-| 字段 | 说明 |
-|------|------|
-| `id` | 审批记录 ID |
-| `action_record_id` | 关联操作 |
-| `approver_user_id` | 审批人 |
-| `decision` | approved / rejected |
-| `comment` | 审批备注 |
-| `client_type` | android / web |
-| `created_at` | 审批时间 |
-
-`ai_notification_records` 用于保存通知记录。
-
-| 字段 | 说明 |
-|------|------|
-| `id` | 通知记录 ID |
-| `action_record_id` | 关联操作 |
-| `user_id` | 通知接收人 |
-| `channel` | android_ws / web_ws / push |
-| `status` | pending / sent / failed / read |
-| `sent_at` | 发送时间 |
-| `read_at` | 阅读时间 |
-
-`ai_model_call_logs` 用于保存 AI 调用记录，但不得保存 API Key。
-
-### 26.11 Android 客户端能力规划
-
-Android App 后续新增 AI 运维能力：
-
-```text
-AI 运维
-├── 待确认操作
-├── 操作详情
-├── 历史记录
-└── 通知设置
-```
-
-页面能力：
-
-| 页面 | 能力 |
-|------|------|
-| 待确认操作 | 查看所有等待审批的 L3/L4 操作 |
-| 操作详情 | 查看主机、问题、AI 原因、风险、影响、超时和执行动作 |
-| 历史记录 | 查看已批准、已拒绝、已执行、已失败、已超时的操作 |
-| 通知设置 | 配置是否接收 AI 审批通知 |
-
-Android 安全要求：
-
-- 用户必须登录。
-- Token 未过期。
-- 用户必须是 `admin` 才能审批。
-- 点击通知后进入详情页，不能直接执行。
-- 审批时后端再次校验权限和操作状态。
-- L4 操作需要二次确认。
-
-### 26.12 AI 运维配置项规划
-
-建议新增配置项：
-
-```text
-AI_OPS_ENABLED=true
-AI_AUTO_ACTION_ENABLED=false
-AI_MAX_AUTO_RISK_LEVEL=L2
-AI_REQUIRE_APPROVAL_RISK_LEVEL=L3
-AI_ACTION_APPROVAL_TIMEOUT_MINUTES=10
-AI_ANDROID_APPROVAL_ENABLED=true
-AI_WEB_APPROVAL_ENABLED=true
-AI_GLOBAL_READ_ONLY=false
-```
-
-| 配置项 | 说明 |
-|--------|------|
-| `AI_OPS_ENABLED` | 是否启用 AI 运维 |
-| `AI_AUTO_ACTION_ENABLED` | 是否允许自动执行低风险操作 |
-| `AI_MAX_AUTO_RISK_LEVEL` | 最高自动执行风险等级 |
-| `AI_REQUIRE_APPROVAL_RISK_LEVEL` | 从哪个等级开始必须审批 |
-| `AI_ACTION_APPROVAL_TIMEOUT_MINUTES` | 审批超时时间 |
-| `AI_ANDROID_APPROVAL_ENABLED` | 是否启用 Android 审批 |
-| `AI_WEB_APPROVAL_ENABLED` | 是否启用 Web 审批 |
-| `AI_GLOBAL_READ_ONLY` | 全局只读模式 |
-
-默认建议：
-
-```text
-AI_AUTO_ACTION_ENABLED=false
-AI_REQUIRE_APPROVAL_RISK_LEVEL=L3
-AI_ANDROID_APPROVAL_ENABLED=true
-AI_WEB_APPROVAL_ENABLED=true
-AI_GLOBAL_READ_ONLY=false
-```
-
-### 26.13 AI 阶段路线
-
-AI 能力建议作为 MVP 后续增强阶段，不影响 MVP-1 实施优先级。
-
-| 阶段 | 目标 |
-|------|------|
-| AI-1 | AI 只读健康分析 |
-| AI-2 | AI 告警解释和处置建议 |
-| AI-3 | AI 低风险动作白名单自动执行 |
-| AI-4 | 中高风险操作推送 Android 请求人工确认 |
-| AI-5 | Web 和 Android 双端审批、操作结果追踪 |
-| AI-6 | 故障复盘、趋势预测、容量规划 |
-
-当前结论：AI 运维中枢是后续重要方向，但不改变 MVP-1 的主线。MVP-1 仍先建设权限、服务器管理、SSH 凭据安全、基础表结构和接口规范，为后续 AI 操作审批和审计打基础。
+AI 运维属于 MVP-8 完成后的远期增强能力，不纳入且不阻塞 MVP-1 至 MVP-8 的设计、开发、测试与交付。完整规划见 [20260717-AI运维增强路线.md](./20260717-AI运维增强路线.md)。
 
 ## 二十七、Git、环境配置与 opencode skill 规划
 

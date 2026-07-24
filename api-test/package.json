@@ -1,0 +1,12 @@
+{
+  "name": "susumonitor-api-validation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify:agent-ws": "node verify-agent-ws.mjs",
+    "verify:monitor-ws": "node verify-monitor-ws.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}

@@ -10,6 +10,9 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.ToString;
 
+/**
+ * 接收服务器全量更新参数，凭据省略和认证方式切换语义由 Service 处理。
+ */
 // 自动生成当前 DTO 的 getter、setter、toString、equals 和 hashCode 方法。
 @Data
 public class UpdateServerRequest {
@@ -26,7 +29,9 @@ public class UpdateServerRequest {
     @Size(max = 255)
     private String host;
 
-    // 限制服务器描述最大长度为 500 个字符，允许不填写。
+    // PUT 要求显式提交服务器描述，但允许提交空描述。
+    @NotNull
+    // 限制服务器描述最大长度为 500 个字符。
     @Size(max = 500)
     private String description;
 
@@ -66,18 +71,24 @@ public class UpdateServerRequest {
 
     // 将 Java 的 sshPassword 属性映射为接口 JSON 字段 ssh_password。
     @JsonProperty("ssh_password")
+    // 限制 SSH 密码长度，省略和更新语义由 Service 校验。
+    @Size(max = 1024)
     // 防止 Lombok 生成的 toString 方法输出 SSH 密码。
     @ToString.Exclude
     private String sshPassword;
 
     // 将 Java 的 sshPrivateKey 属性映射为接口 JSON 字段 ssh_private_key。
     @JsonProperty("ssh_private_key")
+    // 限制 SSH 私钥长度，省略和更新语义由 Service 校验。
+    @Size(max = 65535)
     // 防止 Lombok 生成的 toString 方法输出 SSH 私钥。
     @ToString.Exclude
     private String sshPrivateKey;
 
     // 将 Java 的 sshPrivateKeyPassphrase 属性映射为接口 JSON 字段 ssh_private_key_passphrase。
     @JsonProperty("ssh_private_key_passphrase")
+    // 限制 SSH 私钥口令长度，省略和更新语义由 Service 校验。
+    @Size(max = 1024)
     // 防止 Lombok 生成的 toString 方法输出 SSH 私钥口令。
     @ToString.Exclude
     private String sshPrivateKeyPassphrase;

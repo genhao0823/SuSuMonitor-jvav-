@@ -1,0 +1,9 @@
+susumonitor:
+  jwt:
+    secret: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+    expire-hours: 72
+  security:
+    aes-gcm-key: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+  ssh:
+    allowed-ports: 22,2222
+    allowed-cidrs: 127.0.0.1/32,::1/128

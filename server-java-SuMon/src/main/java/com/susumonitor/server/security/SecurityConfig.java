@@ -1,24 +1,96 @@
 package com.susumonitor.server.security;
 
+import com.susumonitor.server.module.auth.mapper.UserMapper;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * Minimal security configuration for the initial project skeleton.
+ * 配置无状态 Bearer 鉴权和公开接口边界。
  */
+// 将当前类注册为 Spring 安全配置类。
 @Configuration
+// 启用 Web 安全过滤器链。
 @EnableWebSecurity
 public class SecurityConfig {
 
+    /**
+     * 创建 JWT 过滤器，由 Spring Security 过滤器链管理，避免 Servlet 容器重复注册。
+     *
+     * @param jwtTokenService JWT 服务
+     * @param userMapper 用户 Mapper
+     * @param securityErrorHandler 安全错误处理器
+     * @return JWT 认证过滤器
+     */
+    // 将 JWT 过滤器注册为 Spring Bean，供安全链引用。
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+    public JwtAuthenticationFilter jwtAuthenticationFilter(
+            JwtTokenService jwtTokenService,
+            UserMapper userMapper,
+            SecurityErrorHandler securityErrorHandler) {
+        return new JwtAuthenticationFilter(jwtTokenService, userMapper, securityErrorHandler);
+    }
+
+    /**
+     * 禁止 Servlet 容器自动注册 JWT Filter，确保它只在 Spring Security 链中执行一次。
+     *
+     * @param jwtAuthenticationFilter JWT 过滤器
+     * @return 禁用状态的 Servlet Filter 注册配置
+     */
+    // 注册禁用的 Servlet Filter 包装，防止每个请求重复验签和回查数据库。
+    @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(
+            JwtAuthenticationFilter jwtAuthenticationFilter) {
+        FilterRegistrationBean<JwtAuthenticationFilter> registration =
+                new FilterRegistrationBean<>(jwtAuthenticationFilter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    /**
+     * 建立无状态安全链，仅公开健康检查、就绪检查、注册和登录。
+     *
+     * @param httpSecurity Spring Security HTTP 配置
+     * @param jwtAuthenticationFilter JWT 过滤器
+     * @param securityErrorHandler 统一 401/403 处理器
+     * @return 安全过滤器链
+     * @throws Exception 安全链构建失败
+     */
+    // 注册项目唯一的 HTTP 安全过滤器链。
+    @Bean
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity httpSecurity,
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            SecurityErrorHandler securityErrorHandler) throws Exception {
         return httpSecurity
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(registry -> registry.anyRequest().permitAll())
+                .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(securityErrorHandler)
+                        .accessDeniedHandler(securityErrorHandler))
+                .authorizeHttpRequests(registry -> registry
+                        .requestMatchers(HttpMethod.GET, "/api/health", "/api/ready").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
+                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                         .requestMatchers(HttpMethod.POST, "/api/servers").hasRole("ADMIN")
+                         .requestMatchers("/api/servers/*/agent/**").hasRole("ADMIN")
+                        .requestMatchers("/api/servers/*/ssh/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/servers/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/servers/*").hasRole("ADMIN")
+                         .requestMatchers(HttpMethod.GET, "/api/servers", "/api/servers/**").authenticated()
+                         .requestMatchers("/ws/agent", "/ws/monitor").permitAll()
+                         .anyRequest().authenticated())
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 }

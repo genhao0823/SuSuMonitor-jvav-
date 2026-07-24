@@ -1,12 +1,20 @@
 package com.susumonitor.server;
 
+import com.susumonitor.server.module.auth.mapper.AuthBootstrapStateMapper;
 import com.susumonitor.server.module.auth.mapper.UserMapper;
+import com.susumonitor.server.module.server.mapper.ServerMapper;
+import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
+import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.test.context.ActiveProfiles;
 
 import javax.sql.DataSource;
 
+// 激活独立测试配置，避免上下文测试读取本机敏感配置。
+@ActiveProfiles("test")
 @SpringBootTest(properties = {
         "spring.autoconfigure.exclude="
                 + "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
@@ -20,6 +28,23 @@ class SuSuMonitorServerApplicationTests {
     // 使用模拟 Mapper 替代真实数据库 Mapper，保持上下文测试不依赖数据库自动配置。
     @MockitoBean
     private UserMapper userMapper;
+
+    // 使用模拟初始化状态 Mapper，避免上下文测试创建真实 MyBatis 会话依赖。
+    @MockitoBean
+    private AuthBootstrapStateMapper authBootstrapStateMapper;
+
+    // 使用模拟服务器 Mapper，避免新增服务器 Mapper 扫描后创建真实 MyBatis 会话依赖。
+    @MockitoBean
+    private ServerMapper serverMapper;
+
+    @MockitoBean
+    private MetricsMapper metricsMapper;
+
+    @MockitoBean
+    private MetricsCleanupMapper metricsCleanupMapper;
+
+    @MockitoBean
+    private PlatformTransactionManager transactionManager;
 
     @Test
     void contextLoads() {

@@ -1,0 +1,91 @@
+// Package wsclient 管理 SuSuMonitor Agent 与后端的 WebSocket 连接。
+//
+// 连接地址为 ws://<backend>/ws/agent。首帧发送 agent.authenticate，
+// 鉴权成功后可发送 heartbeat 和 metrics.report。
+package wsclient
+
+import (
+	"crypto/rand"
+	"encoding/json"
+	"fmt"
+	"time"
+)
+
+// AgentMessage 是 WebSocket 通用消息结构，与后端协议文档一致。
+//
+// 字段说明见 docs-SuMon/Protocol-SuMon/websocket-protocol.md。
+type AgentMessage struct {
+	Type      string          `json:"type"`
+	MessageID string          `json:"message_id"`
+	Timestamp string          `json:"timestamp"`
+	Payload   json.RawMessage `json:"payload"`
+}
+
+// AuthPayload 是 agent.authenticate 首帧的 payload。
+type AuthPayload struct {
+	ServerID int64  `json:"server_id"`
+	Token    string `json:"token"`
+}
+
+// HeartbeatPayload 是 heartbeat 消息的 payload，为空对象。
+type HeartbeatPayload struct{}
+
+// MetricsPayload 是 metrics.report 消息的指标载荷，与后端固定宽表一一对应。
+//
+// 指针类型字段表示可空；Windows 上 temperature 和 load_avg 通常为 nil。
+type MetricsPayload struct {
+	ServerID      int64    `json:"server_id"`
+	CollectedAt   string   `json:"collected_at"`
+	CPUPercent    *float64 `json:"cpu_percent"`
+	MemoryPercent *float64 `json:"memory_percent"`
+	MemoryUsed    *uint64  `json:"memory_used"`
+	MemoryTotal   *uint64  `json:"memory_total"`
+	DiskPercent   *float64 `json:"disk_percent"`
+	DiskUsed      *uint64  `json:"disk_used"`
+	DiskTotal     *uint64  `json:"disk_total"`
+	NetRx         *uint64  `json:"net_rx"`
+	NetTx         *uint64  `json:"net_tx"`
+	Temperature   *float64 `json:"temperature"`
+	LoadAvg       *float64 `json:"load_avg"`
+}
+
+// newMessage 构造通用 WebSocket 消息，自动生成 message_id 和 timestamp。
+//
+// timestamp 使用 UTC ISO-8601（RFC3339Nano），与后端 OffsetDateTime.toString() 兼容。
+func newMessage(msgType string, payload interface{}) AgentMessage {
+	payloadBytes, _ := json.Marshal(payload)
+	return AgentMessage{
+		Type:      msgType,
+		MessageID: newUUID(),
+		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
+		Payload:   payloadBytes,
+	}
+}
+
+// newAuthMessage 构造 agent.authenticate 首帧消息。
+func newAuthMessage(serverID int64, token string) AgentMessage {
+	return newMessage("agent.authenticate", AuthPayload{
+		ServerID: serverID,
+		Token:    token,
+	})
+}
+
+// newHeartbeatMessage 构造 heartbeat 消息。
+func newHeartbeatMessage() AgentMessage {
+	return newMessage("heartbeat", HeartbeatPayload{})
+}
+
+// newUUID 生成 UUID v4 字符串，用于 message_id。
+//
+// 使用 crypto/rand 生成 16 字节随机数，设置版本位（第 7 字节高 4 位为 0x4）
+// 和变体位（第 9 字节高 2 位为 0b10）。不引入第三方 UUID 库。
+func newUUID() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		// crypto/rand 失败极少见；用时间戳兜底，保证不返回空字符串。
+		return fmt.Sprintf("%x", time.Now().UnixNano())
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+}

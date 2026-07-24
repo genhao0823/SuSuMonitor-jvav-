@@ -1,0 +1,91 @@
+import apiClient from '@/api/client'
+import type {
+  ApiResponse,
+  CreateServerRequest,
+  PageResult,
+  Server,
+  ServerQuery,
+  ServerStatus,
+  SshTestResult,
+  UpdateServerRequest
+} from '@/types/api'
+
+/**
+ * 查询服务器分页列表。支持 page/page_size/sort/sort_order 以及 name/host/keyword 检索。
+ *
+ * @param query 查询参数对象
+ * @returns 分页结果
+ */
+export function listServers(
+  query: ServerQuery = {}
+): Promise<ApiResponse<PageResult<Server>>> {
+  return apiClient
+    .get<ApiResponse<PageResult<Server>>>('/servers', { params: query })
+    .then((r) => r.data)
+}
+
+/**
+ * 获取单台服务器公开 VO(不含凭据明文或密文)。
+ *
+ * @param id 服务器 ID
+ */
+export function getServer(id: number): Promise<ApiResponse<Server>> {
+  return apiClient
+    .get<ApiResponse<Server>>(`/servers/${id}`)
+    .then((r) => r.data)
+}
+
+/**
+ * 获取服务器状态快照(状态、Agent、上次心跳)。
+ *
+ * @param id 服务器 ID
+ */
+export function getServerStatus(id: number): Promise<ApiResponse<ServerStatus>> {
+  return apiClient
+    .get<ApiResponse<ServerStatus>>(`/servers/${id}/status`)
+    .then((r) => r.data)
+}
+
+/**
+ * 创建服务器。失败抛出 ApiBusinessError,字段级 40002 由调用方映射到表单。
+ */
+export function createServer(
+  body: CreateServerRequest
+): Promise<ApiResponse<Server>> {
+  return apiClient
+    .post<ApiResponse<Server>>('/servers', body)
+    .then((r) => r.data)
+}
+
+/**
+ * 更新服务器。仅传 body 中实际有变化的字段;空字符串凭据会被剔除,
+ * 由后端按 OpenAPI 语义"省略=保留原值"处理。
+ */
+export function updateServer(
+  id: number,
+  body: UpdateServerRequest
+): Promise<ApiResponse<Server>> {
+  return apiClient
+    .put<ApiResponse<Server>>(`/servers/${id}`, body)
+    .then((r) => r.data)
+}
+
+/**
+ * 软删除服务器(后端 OpenAPI 描述)。
+ * 成功响应通常为 ApiResponse<null> 或 ApiResponse<{}>。
+ */
+export function deleteServer(id: number): Promise<ApiResponse<null>> {
+  return apiClient
+    .delete<ApiResponse<null>>(`/servers/${id}`)
+    .then((r) => r.data)
+}
+
+/**
+ * 触发目标服务器的 SSH 连接测试(后端 MVP-7 接入)。
+ * 成功:ApiResponse<SshTestResult>;失败抛 ApiBusinessError。
+ */
+export function testSshConnection(id: number): Promise<ApiResponse<SshTestResult>> {
+  return apiClient
+    .post<ApiResponse<SshTestResult>>(`/servers/${id}/ssh/test`)
+    .then((r) => r.data)
+}
