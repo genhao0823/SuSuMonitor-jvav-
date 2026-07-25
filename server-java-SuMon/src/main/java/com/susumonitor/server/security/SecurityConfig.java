@@ -94,6 +94,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/servers/*/ssh/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/servers/*").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/servers/*").hasRole("ADMIN")
+                        // 告警规则创建、更新和删除需要 admin 角色。
+                        .requestMatchers(HttpMethod.POST, "/api/alerts/rules").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/alerts/rules/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/alerts/rules/*").hasRole("ADMIN")
+                        // 告警规则查询和告警记录查询、标记已读需要已认证。
+                        .requestMatchers(HttpMethod.GET, "/api/alerts/rules", "/api/alerts/rules/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/alerts/records", "/api/alerts/records/**").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/alerts/records/*/read").authenticated()
                          .requestMatchers(HttpMethod.GET, "/api/servers", "/api/servers/**").authenticated()
                          .requestMatchers("/ws/agent", "/ws/monitor").permitAll()
                          .anyRequest().authenticated())

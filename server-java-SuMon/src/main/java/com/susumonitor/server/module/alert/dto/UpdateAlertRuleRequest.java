@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import java.math.BigDecimal;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 /**
@@ -18,6 +19,7 @@ public class UpdateAlertRuleRequest {
     // 告警阈值，必须非负。
     @NotNull(message = "threshold value must not be null")
     @PositiveOrZero(message = "threshold value must be non-negative")
+    @JsonProperty("threshold_value")
     private BigDecimal thresholdValue;
     // 告警等级: warning/critical。
     @NotBlank(message = "level must not be blank")

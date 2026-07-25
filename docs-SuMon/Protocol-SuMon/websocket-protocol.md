@@ -99,6 +99,24 @@ Both Agent and Monitor channels use the same `error` message shape:
 
 The `code` field uses the same numeric business error codes as the REST API (`ErrorCode.java`). Clients should branch on `code` rather than parsing `message` text.
 
+## Alert Messages
+
+After an alert is triggered and the alert evaluation transaction commits, subscribers of the affected server receive `alert.push`:
+
+```json
+{
+  "type": "alert.push",
+  "message_id": "uuid",
+  "timestamp": "2026-07-22T00:00:00Z",
+  "payload": {
+    "server_id": 1,
+    "alert": {"id": 1, "rule_id": 2, "metric": "cpu", "current_value": 90.5, "threshold_value": 80.0, "level": "warning", "status": "unread", "triggered_at": "2026-07-22T00:00:00Z"}
+  }
+}
+```
+
+`alert.push` reuses the `/ws/monitor` channel and `MonitorSubscriptionRegistry`. Only sessions subscribed to the affected `server_id` receive the push. The broadcast never contains Agent Token, SSH credentials, or database credentials.
+
 ## Runtime Validation
 
 The following paths were validated against the isolated MySQL database `susumonitor_agent_ws_validation_20260721` and an application instance on port 18081:
