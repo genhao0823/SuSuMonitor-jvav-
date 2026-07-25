@@ -8,6 +8,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -57,6 +58,10 @@ public class SecurityConfig {
     /**
      * 建立无状态安全链，仅公开健康检查、就绪检查、注册和登录。
      *
+     * <p>CORS 通过 {@code Customizer.withDefaults()} 启用，实际配置由
+     * {@code CorsConfig} 提供的 {@code CorsConfigurationSource} Bean 决定。
+     * 在 {@code @WebMvcTest} 环境中该 Bean 不存在时，CORS 不处理但不会启动失败。</p>
+     *
      * @param httpSecurity Spring Security HTTP 配置
      * @param jwtAuthenticationFilter JWT 过滤器
      * @param securityErrorHandler 统一 401/403 处理器
@@ -74,6 +79,8 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
+                // 启用 CORS 处理，配置源由 CorsConfig 提供 CorsConfigurationSource Bean。
+                .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(securityErrorHandler)

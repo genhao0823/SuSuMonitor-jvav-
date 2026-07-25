@@ -19,9 +19,16 @@ public class AgentWebSocketConfig implements WebSocketConfigurer {
         this.agentWebSocketHandler = agentWebSocketHandler;
     }
 
-    /** 将 Agent Handler 注册到固定地址。 */
+    /**
+     * 将 Agent Handler 注册到固定地址。
+     *
+     * <p>不配置 Origin 白名单：Agent 是原生 Go 客户端，不发 Origin header，
+     * 安全由首帧 Agent Token 鉴权和 10 秒超时关闭保证。Spring 的
+     * isSameOrigin 会对缺失 Origin 的请求放行，因此 Origin 白名单对
+     * Agent 通道无实际拦截效果。</p>
+     */
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(agentWebSocketHandler, "/ws/agent").setAllowedOriginPatterns("*");
+        registry.addHandler(agentWebSocketHandler, "/ws/agent");
     }
 }

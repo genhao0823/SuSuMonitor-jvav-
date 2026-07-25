@@ -38,6 +38,10 @@ public class AppProperties {
     @Valid
     private final Metrics metrics = new Metrics();
 
+    // 递归校验 CORS 允许的前端 Origin 白名单。
+    @Valid
+    private final Cors cors = new Cors();
+
     public Jwt getJwt() {
         return jwt;
     }
@@ -56,6 +60,10 @@ public class AppProperties {
 
     public Metrics getMetrics() {
         return metrics;
+    }
+
+    public Cors getCors() {
+        return cors;
     }
 
     public static class Jwt {
@@ -263,6 +271,61 @@ public class AppProperties {
 
         public void setCleanupMaxBatchesPerRun(int cleanupMaxBatchesPerRun) {
             this.cleanupMaxBatchesPerRun = cleanupMaxBatchesPerRun;
+        }
+    }
+
+    /**
+     * CORS 跨域配置，控制 REST API 允许的前端 Origin、方法和请求头。
+     */
+    public static class Cors {
+
+        // 允许的前端 Origin 列表，至少配置一个；空列表在启动校验时失败。
+        @NotEmpty(message = "CORS allowed origins must not be empty")
+        private List<String> allowedOrigins = new ArrayList<>(
+                List.of("http://localhost:5173", "http://127.0.0.1:5173"));
+
+        // 允许的 HTTP 方法，覆盖 REST API 全部操作。
+        private List<String> allowedMethods = new ArrayList<>(
+                List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+
+        // 允许的请求头，包含认证、内容和追踪头。
+        private List<String> allowedHeaders = new ArrayList<>(
+                List.of("Authorization", "Content-Type", "X-Correlation-ID"));
+
+        // 预检缓存时间（秒），减少浏览器重复 OPTIONS 请求。
+        @Min(value = 0, message = "CORS max age must not be negative")
+        private long maxAgeSeconds = 3600;
+
+        public List<String> getAllowedOrigins() {
+            return allowedOrigins;
+        }
+
+        public void setAllowedOrigins(List<String> allowedOrigins) {
+            this.allowedOrigins = allowedOrigins;
+        }
+
+        public List<String> getAllowedMethods() {
+            return allowedMethods;
+        }
+
+        public void setAllowedMethods(List<String> allowedMethods) {
+            this.allowedMethods = allowedMethods;
+        }
+
+        public List<String> getAllowedHeaders() {
+            return allowedHeaders;
+        }
+
+        public void setAllowedHeaders(List<String> allowedHeaders) {
+            this.allowedHeaders = allowedHeaders;
+        }
+
+        public long getMaxAgeSeconds() {
+            return maxAgeSeconds;
+        }
+
+        public void setMaxAgeSeconds(long maxAgeSeconds) {
+            this.maxAgeSeconds = maxAgeSeconds;
         }
     }
 }
