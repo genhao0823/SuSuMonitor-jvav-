@@ -146,11 +146,11 @@ async function handleTestConnection(row: Server): Promise<void> {
 
 后端修完后:
 
-- [ ] `POST /api/servers/99999/ssh/test` 返回 `40400`(不存在)
-- [ ] `POST /api/servers/{existing_id}/ssh/test` 未实现时返回 `50700`
-- [ ] `POST /api/servers/{existing_id}/ssh/test` SSH 失败返回 `50002`
-- [x] `POST /api/servers/{existing_id}/ssh/test` auth 失败返回 `50003`
-- [ ] 成功响应 body 符合 OpenAPI `SshTestVo` schema
+- [x] `POST /api/servers/99999/ssh/test` 返回 `40400`(不存在)（2026-07-25 真实 HTTP 验证：40400 ✅）
+- [ ] `POST /api/servers/{existing_id}/ssh/test` 未实现时返回 `50700`（50700 已废弃不实现，跳过）
+- [x] `POST /api/servers/{existing_id}/ssh/test` 连接阶段失败返回 `50002`（2026-07-25 真实 HTTP/Apifox 验收通过）
+- [x] `POST /api/servers/{existing_id}/ssh/test` auth 失败返回 `50003`（2026-07-25 真实 HTTP/SSHD 验收通过）
+- [x] 成功响应 body 符合 OpenAPI `SshTestVo` schema（OpenAPI `SshConnectionTestResult` schema 与 `SshTestVo.java` 字段 1:1 对齐）
 - [x] OpenAPI 文档同步更新错误码表
 
 ## J4 实现与验证结果（2026-07-23）
@@ -183,3 +183,51 @@ C:\Backup\SuSuMonitor\java-backend-closure-20260723\J5-susumonitor-before-ssh-ap
 TCP 连接、SSH KEX 和 Java 出站策略均已通过，但 sshj 主机密钥握手返回 `50002`，未成功登记主机指纹，因此未到达用户认证阶段，不能将本轮记为真实 `50003` 通过。使用实际 ED25519 和 RSA 指纹分别重试后仍为 `50002`，需后续排查 sshj 0.39.0 与当前 OpenSSH 主机密钥协商兼容性。
 
 测试服务器 ID `39` 随后仅通过业务接口软删除：HTTP 200、业务码 0；数据库行保留且 `deleted=1`、`deleted_at` 非空、`delete_token` 非空。未执行物理删除、TRUNCATE、DROP 或数据库重置。
+
+## J6 真实 SSH 认证失败验收（2026-07-25）
+
+本次使用重新打包的 Spring Boot JAR、独立 WSL OpenSSH `127.0.0.1:2223` 和受控本机验证身份进行验收。临时 SSHD 使用独立 RSA 主机密钥；真实密码仅在运行时内存中使用，未写入 Git、Apifox、文档或日志。
+
+验收步骤：
+
+1. 通过业务接口创建唯一服务器记录 `ID=50`，保存故意错误的 SSH 密码。
+2. 通过 `PUT /api/servers/50/ssh/host-key` 登记带外获取的正确 SHA-256 指纹，HTTP 200、业务码 0。
+3. 使用真正无请求体且不携带 `Content-Type` 的 `POST /api/servers/50/ssh/test` 发起认证测试。
+4. 响应为 HTTP 502、业务码 `50003`、消息 `ssh authentication failed`；`X-Request-ID` 为合法 UUID，响应不含密码、JWT、私钥或底层异常信息。
+5. 仅通过 `DELETE /api/servers/50` 软删除测试记录；数据库行保留且 `deleted=1`。
+
+客户端诊断日志确认：
+
+```text
+findExistingAlgorithms() -> []
+host key observed -> algorithm=ssh-rsa, algorithmMatched=true, fingerprintMatched=true
+negotiatedHostKeyAlgorithm=rsa-sha2-512
+authentication exception -> UserAuthException
+```
+
+独立 SSHD 日志确认已经进入 `userauth-request method password`，随后记录 `Failed password`，不是认证前关闭或主机密钥协商失败。
+
+诊断材料备份：
+
+```text
+C:\Backup\SuSuMonitor\java-backend-closure-20260723\ssh-50003-diagnostic-20260725\sshdiag50003.tar.gz
+```
+
+该验收解除 J5 的“sshj 主机密钥握手阻塞”边界；当前真实错误密码路径已确认 `UserAuthException -> AUTHENTICATION_FAILED -> HTTP 502 / 50003`。
+
+## J7 真实 SSH 连接失败验收（2026-07-25）
+
+本次先启动独立 WSL OpenSSH `127.0.0.1:2223` 并完成正确主机指纹登记，然后停止该 SSHD，再调用无请求体的 SSH test 接口。该顺序确保失败发生在已确认主机身份后的 TCP 连接阶段，而不是主机密钥校验或用户认证阶段。
+
+Apifox 独立用例：
+
+```text
+项目：8585366
+分支：ai/20260725-from-main-ssh-50003-validation
+用例：397698534
+名称：J7 SSH connection refused returns 50002
+```
+
+真实 JUnit 报告断言 HTTP `502`、业务码 `50002`、消息 `ssh connection failed` 和 `X-Request-ID` 存在，4 项断言均通过。临时服务器仅通过业务接口软删除，临时 SSHD、密钥目录和后端进程均已清理。
+
+当前已确认连接阶段异常映射为 `CONNECTION_FAILED -> HTTP 502 / 50002`，认证阶段异常映射为 `AUTHENTICATION_FAILED -> HTTP 502 / 50003`。
