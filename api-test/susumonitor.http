@@ -194,10 +194,61 @@ GET {{baseUrl}}/api/servers/{{serverId}}/metrics?start_time=2026-07-21T00:00:00Z
 Authorization: Bearer {{userToken}}
 X-Correlation-ID: local-metrics-history
 
-### Alerts: rules placeholder for MVP-6
-# GET {{baseUrl}}/api/alerts/rules
-# Authorization: Bearer {{userToken}}
+### Alerts: create rule (admin only)
+POST {{baseUrl}}/api/alerts/rules
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+X-Correlation-ID: local-alert-create-rule
 
-### Alerts: records placeholder for MVP-6
-# GET {{baseUrl}}/api/alerts/records
-# Authorization: Bearer {{userToken}}
+{
+  "server_id": 1,
+  "metric": "cpu",
+  "operator": ">",
+  "threshold_value": 80,
+  "level": "warning"
+}
+
+### Alerts: create general rule (null server_id matches all servers)
+POST {{baseUrl}}/api/alerts/rules
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+X-Correlation-ID: local-alert-create-general-rule
+
+{
+  "metric": "memory",
+  "operator": ">=",
+  "threshold_value": 90,
+  "level": "critical"
+}
+
+### Alerts: list rules
+GET {{baseUrl}}/api/alerts/rules
+Authorization: Bearer {{userToken}}
+X-Correlation-ID: local-alert-list-rules
+
+### Alerts: update rule
+PUT {{baseUrl}}/api/alerts/rules/1
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+X-Correlation-ID: local-alert-update-rule
+
+{
+  "threshold_value": 90,
+  "level": "critical",
+  "enabled": true
+}
+
+### Alerts: delete rule (soft delete)
+DELETE {{baseUrl}}/api/alerts/rules/1
+Authorization: Bearer {{adminToken}}
+X-Correlation-ID: local-alert-delete-rule
+
+### Alerts: list records (paginated)
+GET {{baseUrl}}/api/alerts/records?server_id=1&status=unread&page=1&page_size=20
+Authorization: Bearer {{userToken}}
+X-Correlation-ID: local-alert-list-records
+
+### Alerts: mark record as read
+PUT {{baseUrl}}/api/alerts/records/1/read
+Authorization: Bearer {{userToken}}
+X-Correlation-ID: local-alert-mark-read
