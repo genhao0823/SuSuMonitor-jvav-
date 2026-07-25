@@ -28,6 +28,8 @@ import net.schmizz.sshj.userauth.keyprovider.KeyProvider;
 import net.schmizz.sshj.userauth.UserAuthException;
 import net.schmizz.sshj.userauth.password.PasswordFinder;
 import net.schmizz.sshj.userauth.password.PasswordUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -36,6 +38,8 @@ import org.springframework.stereotype.Component;
 // 将 SSH 网络组件注册为 Spring Bean，并集中执行连接资源限制。
 @Component
 public class SshConnectionTester implements AutoCloseable {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(SshConnectionTester.class);
 
     private final SshOutboundPolicy outboundPolicy;
     private final int connectTimeoutMillis;
@@ -199,15 +203,26 @@ public class SshConnectionTester implements AutoCloseable {
             sshClient.setTimeout(socketTimeoutMillis);
             try {
                 sshClient.connect(address, port);
+                LOGGER.debug("SSH transport connected: host={}, port={}, negotiatedHostKeyAlgorithm={}",
+                        address.getHostAddress(), port, negotiatedHostKeyAlgorithm(sshClient));
                 ensureActive(cancelled);
                 operation.run(sshClient, cancelled);
                 return verifier.observation();
             } catch (SshConnectionException exception) {
                 throw exception;
             } catch (UserAuthException exception) {
+                LOGGER.debug("SSH authentication failed after verified host key: host={}, port={}, "
+                                + "exceptionType={}, negotiatedHostKeyAlgorithm={}, observedAlgorithm={}",
+                        address.getHostAddress(), port, exception.getClass().getSimpleName(),
+                        negotiatedHostKeyAlgorithm(sshClient), verifier.observedAlgorithm());
                 throw new SshConnectionException(SshConnectionException.Category.AUTHENTICATION_FAILED, exception);
             } catch (IOException | RuntimeException exception) {
                 ensureActive(cancelled);
+                LOGGER.debug("SSH transport failed: host={}, port={}, exceptionType={}, "
+                                + "negotiatedHostKeyAlgorithm={}, observed={}, matched={}, observedAlgorithm={}",
+                        address.getHostAddress(), port, exception.getClass().getSimpleName(),
+                        negotiatedHostKeyAlgorithm(sshClient), verifier.observed(), verifier.matched(),
+                        verifier.observedAlgorithm());
                 if (verifier.observed() && !verifier.matched()) {
                     throw new SshConnectionException(SshConnectionException.Category.HOST_KEY_MISMATCH, exception);
                 }
@@ -220,6 +235,14 @@ public class SshConnectionTester implements AutoCloseable {
         throw lastFailure == null
                 ? new SshConnectionException(SshConnectionException.Category.CONNECTION_FAILED)
                 : lastFailure;
+    }
+
+    /** 读取 sshj 实际协商的主机密钥算法，连接尚未建立时返回 null。 */
+    private String negotiatedHostKeyAlgorithm(SSHClient sshClient) {
+        if (sshClient.getTransport() == null || sshClient.getTransport().getHostKeyAlgorithm() == null) {
+            return null;
+        }
+        return sshClient.getTransport().getHostKeyAlgorithm().getKeyAlgorithm();
     }
 
     /** 在超时或调用线程中断后阻止继续尝试地址或取得凭据。 */
@@ -253,14 +276,14 @@ public class SshConnectionTester implements AutoCloseable {
     }
 
     /** 捕获远端公钥并使用 sshj SHA-256 verifier 完成恒定内容比较。 */
-    private static final class CapturingHostKeyVerifier implements HostKeyVerifier {
+    static final class CapturingHostKeyVerifier implements HostKeyVerifier {
 
         private final HostKeyVerifier fingerprintVerifier;
         private final String expectedAlgorithm;
         private volatile SshHostKeyObservation observation;
         private volatile boolean matched;
 
-        private CapturingHostKeyVerifier(String expectedFingerprint, String expectedAlgorithm) {
+        CapturingHostKeyVerifier(String expectedFingerprint, String expectedAlgorithm) {
             this.fingerprintVerifier = FingerprintVerifier.getInstance(expectedFingerprint);
             this.expectedAlgorithm = expectedAlgorithm;
         }
@@ -272,14 +295,24 @@ public class SshConnectionTester implements AutoCloseable {
             String fingerprint = sha256Fingerprint(key);
             this.observation = new SshHostKeyObservation(algorithm, fingerprint);
             boolean algorithmMatches = expectedAlgorithm == null || expectedAlgorithm.equals(algorithm);
-            this.matched = algorithmMatches && fingerprintVerifier.verify(hostname, port, key);
+            boolean fingerprintMatches = fingerprintVerifier.verify(hostname, port, key);
+            this.matched = algorithmMatches && fingerprintMatches;
+            LOGGER.debug("SSH host key observed: host={}, port={}, algorithm={}, fingerprint={}, "
+                            + "algorithmMatched={}, fingerprintMatched={}",
+                    hostname, port, algorithm, fingerprint, algorithmMatches, fingerprintMatches);
             return matched;
         }
 
         /** 不提示 sshj 放宽或替换算法，只接受正常协商结果。 */
         @Override
         public List<String> findExistingAlgorithms(String hostname, int port) {
+            LOGGER.debug("SSH host key algorithm lookup: host={}, port={}, algorithms=[]", hostname, port);
             return List.of();
+        }
+
+        /** 返回已观察到的算法，仅用于连接失败时的诊断日志和同包测试。 */
+        String observedAlgorithm() {
+            return observation == null ? null : observation.algorithm();
         }
 
         /** 返回已观察且通过校验的主机密钥。 */
@@ -294,7 +327,7 @@ public class SshConnectionTester implements AutoCloseable {
             return observation != null;
         }
 
-        private boolean matched() {
+        boolean matched() {
             return matched;
         }
 
