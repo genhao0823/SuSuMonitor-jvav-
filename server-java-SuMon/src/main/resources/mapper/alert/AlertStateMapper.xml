@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susumonitor.server.module.alert.mapper.AlertStateMapper">
+    <resultMap id="AlertStateResultMap" type="com.susumonitor.server.module.alert.entity.AlertStateEntity">
+        <id column="id" property="id"/>
+        <result column="rule_id" property="ruleId"/>
+        <result column="server_id" property="serverId"/>
+        <result column="active" property="active"/>
+        <result column="alert_record_id" property="alertRecordId"/>
+        <result column="first_triggered_at" property="firstTriggeredAt"/>
+        <result column="last_triggered_at" property="lastTriggeredAt"/>
+        <result column="resolved_at" property="resolvedAt"/>
+        <result column="version" property="version"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+    <sql id="StateColumns">id, rule_id, server_id, active, alert_record_id, first_triggered_at,
+        last_triggered_at, resolved_at, version, created_at, updated_at</sql>
+    <select id="selectByRuleAndServer" resultMap="AlertStateResultMap">
+        SELECT <include refid="StateColumns"/> FROM alert_states
+        WHERE rule_id = #{ruleId} AND server_id = #{serverId}
+    </select>
+    <insert id="insertState" useGeneratedKeys="true" keyProperty="state.id">
+        INSERT INTO alert_states (rule_id, server_id, active, alert_record_id, first_triggered_at, last_triggered_at, version)
+        VALUES (#{state.ruleId}, #{state.serverId}, #{state.active}, #{state.alertRecordId},
+            #{state.firstTriggeredAt}, #{state.lastTriggeredAt}, #{state.version})
+    </insert>
+    <update id="updateStateActive">
+        UPDATE alert_states
+        SET active = 1, alert_record_id = #{alertRecordId}, last_triggered_at = #{lastTriggeredAt}, version = version + 1
+        WHERE id = #{id} AND version = #{version}
+    </update>
+    <update id="updateStateResolved">
+        UPDATE alert_states
+        SET active = 0, resolved_at = #{resolvedAt}, version = version + 1
+        WHERE id = #{id} AND version = #{version}
+    </update>
+</mapper>

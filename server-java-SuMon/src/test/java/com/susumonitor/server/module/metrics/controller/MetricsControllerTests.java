@@ -27,6 +27,9 @@ import com.susumonitor.server.module.server.mapper.ServerMapper;
 import com.susumonitor.server.security.JwtTokenService;
 import com.susumonitor.server.security.SecurityConfig;
 import com.susumonitor.server.security.SecurityErrorHandler;
+import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
+import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
+import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -84,6 +87,16 @@ class MetricsControllerTests {
     // 替代全局 Mapper 扫描注册的指标清理 Mapper。
     @MockitoBean
     private MetricsCleanupMapper metricsCleanupMapper;
+
+    // 使用模拟告警 Mapper，避免告警模块 Mapper 扫描后创建真实 MyBatis 会话依赖。
+    @MockitoBean
+    private AlertRuleMapper alertRuleMapper;
+
+    @MockitoBean
+    private AlertRecordMapper alertRecordMapper;
+
+    @MockitoBean
+    private AlertStateMapper alertStateMapper;
 
     /** 验证已审核用户可查询最新指标，且响应字段保持 snake_case。 */
     @Test

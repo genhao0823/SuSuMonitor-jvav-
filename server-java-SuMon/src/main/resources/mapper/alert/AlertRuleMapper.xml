@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susumonitor.server.module.alert.mapper.AlertRuleMapper">
+    <resultMap id="AlertRuleResultMap" type="com.susumonitor.server.module.alert.entity.AlertRuleEntity">
+        <id column="id" property="id"/>
+        <result column="server_id" property="serverId"/>
+        <result column="metric" property="metric"/>
+        <result column="operator" property="operator"/>
+        <result column="threshold_value" property="thresholdValue"/>
+        <result column="level" property="level"/>
+        <result column="enabled" property="enabled"/>
+        <result column="deleted" property="deleted"/>
+        <result column="deleted_at" property="deletedAt"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+    <sql id="RuleColumns">id, server_id, metric, operator, threshold_value, level, enabled,
+        deleted, deleted_at, created_by, created_at, updated_at</sql>
+    <insert id="insertRule" useGeneratedKeys="true" keyProperty="rule.id">
+        INSERT INTO alert_rules (server_id, metric, operator, threshold_value, level, enabled, created_by)
+        VALUES (#{rule.serverId}, #{rule.metric}, #{rule.operator}, #{rule.thresholdValue},
+            #{rule.level}, #{rule.enabled}, #{rule.createdBy})
+    </insert>
+    <select id="selectActiveRuleById" resultMap="AlertRuleResultMap">
+        SELECT <include refid="RuleColumns"/> FROM alert_rules
+        WHERE id = #{id} AND deleted = 0
+    </select>
+    <select id="selectActiveRules" resultMap="AlertRuleResultMap">
+        SELECT <include refid="RuleColumns"/> FROM alert_rules
+        WHERE deleted = 0 ORDER BY created_at DESC, id DESC
+    </select>
+    <select id="selectEnabledRulesForServer" resultMap="AlertRuleResultMap">
+        SELECT <include refid="RuleColumns"/> FROM alert_rules
+        WHERE deleted = 0 AND enabled = 1
+          AND (server_id = #{serverId} OR server_id IS NULL)
+        ORDER BY server_id DESC, id ASC
+    </select>
+    <update id="updateRule">
+        UPDATE alert_rules
+        SET threshold_value = #{thresholdValue}, level = #{level}, enabled = #{enabled}
+        WHERE id = #{id} AND deleted = 0
+    </update>
+    <update id="softDeleteRule">
+        UPDATE alert_rules
+        SET deleted = 1, deleted_at = #{deletedAt}
+        WHERE id = #{id} AND deleted = 0
+    </update>
+</mapper>

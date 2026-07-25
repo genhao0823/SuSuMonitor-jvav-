@@ -28,6 +28,9 @@ import com.susumonitor.server.module.server.vo.AgentTokenVo;
 import com.susumonitor.server.security.JwtTokenService;
 import com.susumonitor.server.security.SecurityConfig;
 import com.susumonitor.server.security.SecurityErrorHandler;
+import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
+import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
+import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -85,6 +88,16 @@ class AgentTokenControllerTests {
     // 替代全局 Mapper 扫描注册的指标清理 Mapper。
     @MockitoBean
     private MetricsCleanupMapper metricsCleanupMapper;
+
+    // 使用模拟告警 Mapper，避免告警模块 Mapper 扫描后创建真实 MyBatis 会话依赖。
+    @MockitoBean
+    private AlertRuleMapper alertRuleMapper;
+
+    @MockitoBean
+    private AlertRecordMapper alertRecordMapper;
+
+    @MockitoBean
+    private AlertStateMapper alertStateMapper;
 
     /** 验证管理员可注册和轮换 Token，明文仅出现在这两个一次性响应中。 */
     @Test

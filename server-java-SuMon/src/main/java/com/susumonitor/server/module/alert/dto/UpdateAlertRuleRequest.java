@@ -1,0 +1,28 @@
+package com.susumonitor.server.module.alert.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
+import java.math.BigDecimal;
+import lombok.Data;
+
+/**
+ * 更新告警规则请求 DTO。
+ *
+ * <p>只允许更新阈值、等级和启用状态，不允许修改 metric、operator 和 serverId。
+ * 这些核心字段在创建后不可变，修改它们等价于新建规则。</p>
+ */
+@Data
+public class UpdateAlertRuleRequest {
+
+    // 告警阈值，必须非负。
+    @NotNull(message = "threshold value must not be null")
+    @PositiveOrZero(message = "threshold value must be non-negative")
+    private BigDecimal thresholdValue;
+    // 告警等级: warning/critical。
+    @NotBlank(message = "level must not be blank")
+    private String level;
+    // 是否启用。
+    @NotNull(message = "enabled must not be null")
+    private Boolean enabled;
+}

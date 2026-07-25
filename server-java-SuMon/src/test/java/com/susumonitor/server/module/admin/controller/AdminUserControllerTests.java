@@ -19,6 +19,9 @@ import com.susumonitor.server.common.BusinessException;
 import com.susumonitor.server.common.ErrorCode;
 import com.susumonitor.server.security.AuthenticatedUser;
 import com.susumonitor.server.security.JwtTokenService;
+import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
+import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
+import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -75,6 +78,16 @@ class AdminUserControllerTests {
 
     @MockitoBean
     private MetricsCleanupMapper metricsCleanupMapper;
+
+    // 使用模拟告警 Mapper，避免告警模块 Mapper 扫描后创建真实 MyBatis 会话依赖。
+    @MockitoBean
+    private AlertRuleMapper alertRuleMapper;
+
+    @MockitoBean
+    private AlertRecordMapper alertRecordMapper;
+
+    @MockitoBean
+    private AlertStateMapper alertStateMapper;
 
     @MockitoBean
     private PlatformTransactionManager transactionManager;

@@ -1,0 +1,164 @@
+package com.susumonitor.server.module.alert.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.susumonitor.server.common.BusinessException;
+import com.susumonitor.server.common.ErrorCode;
+import com.susumonitor.server.module.alert.dto.CreateAlertRuleRequest;
+import com.susumonitor.server.module.alert.dto.UpdateAlertRuleRequest;
+import com.susumonitor.server.module.alert.entity.AlertRuleEntity;
+import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
+import com.susumonitor.server.module.alert.vo.AlertRuleVo;
+import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+/**
+ * 验证告警规则 CRUD 服务。
+ */
+@ExtendWith(MockitoExtension.class)
+class AlertRuleServiceTests {
+
+    private static final Instant FIXED_TIME = Instant.parse("2026-07-22T00:00:00Z");
+    private static final Clock CLOCK = Clock.fixed(FIXED_TIME, ZoneOffset.UTC);
+
+    @Mock
+    private AlertRuleMapper ruleMapper;
+    @InjectMocks
+    private AlertRuleService service;
+
+    /** admin 创建合法规则应成功。 */
+    @Test
+    void createRuleShouldSucceed() {
+        service = new AlertRuleService(ruleMapper, CLOCK);
+        CreateAlertRuleRequest request = new CreateAlertRuleRequest();
+        request.setServerId(1L);
+        request.setMetric("cpu");
+        request.setOperator(">");
+        request.setThresholdValue(new BigDecimal("80"));
+        request.setLevel("warning");
+
+        AlertRuleEntity entity = ruleEntity(1L, "cpu", ">", "80", "warning");
+        when(ruleMapper.selectActiveRuleById(any())).thenReturn(entity);
+
+        AlertRuleVo vo = service.createRule(request, 10L);
+
+        verify(ruleMapper).insertRule(any());
+        assertEquals(1L, vo.getId());
+        assertEquals("cpu", vo.getMetric());
+        assertEquals("warning", vo.getLevel());
+    }
+
+    /** 非法 metric 应返回 40002。 */
+    @Test
+    void invalidMetricShouldReturnInvalidParameter() {
+        service = new AlertRuleService(ruleMapper, CLOCK);
+        CreateAlertRuleRequest request = new CreateAlertRuleRequest();
+        request.setMetric("network");
+        request.setOperator(">");
+        request.setThresholdValue(new BigDecimal("80"));
+        request.setLevel("warning");
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.createRule(request, 10L));
+        assertEquals(ErrorCode.INVALID_REQUEST_PARAMETER, exception.getErrorCode());
+    }
+
+    /** 非法 operator 应返回 40002。 */
+    @Test
+    void invalidOperatorShouldReturnInvalidParameter() {
+        service = new AlertRuleService(ruleMapper, CLOCK);
+        CreateAlertRuleRequest request = new CreateAlertRuleRequest();
+        request.setMetric("cpu");
+        request.setOperator("==");
+        request.setThresholdValue(new BigDecimal("80"));
+        request.setLevel("warning");
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.createRule(request, 10L));
+        assertEquals(ErrorCode.INVALID_REQUEST_PARAMETER, exception.getErrorCode());
+    }
+
+    /** 更新不存在的规则应返回 40400。 */
+    @Test
+    void updateNonexistentRuleShouldReturnNotFound() {
+        service = new AlertRuleService(ruleMapper, CLOCK);
+        when(ruleMapper.selectActiveRuleById(999L)).thenReturn(null);
+
+        UpdateAlertRuleRequest request = new UpdateAlertRuleRequest();
+        request.setThresholdValue(new BigDecimal("90"));
+        request.setLevel("critical");
+        request.setEnabled(true);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.updateRule(999L, request));
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, exception.getErrorCode());
+    }
+
+    /** 软删除不存在的规则应返回 40400。 */
+    @Test
+    void deleteNonexistentRuleShouldReturnNotFound() {
+        service = new AlertRuleService(ruleMapper, CLOCK);
+        when(ruleMapper.selectActiveRuleById(999L)).thenReturn(null);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.deleteRule(999L));
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, exception.getErrorCode());
+    }
+
+    /** 软删除已存在的规则应调用 softDeleteRule。 */
+    @Test
+    void deleteRuleShouldSoftDelete() {
+        service = new AlertRuleService(ruleMapper, CLOCK);
+        when(ruleMapper.selectActiveRuleById(1L)).thenReturn(ruleEntity(1L, "cpu", ">", "80", "warning"));
+
+        service.deleteRule(1L);
+
+        verify(ruleMapper).softDeleteRule(eq(1L), any(LocalDateTime.class));
+    }
+
+    /** 列表查询应返回所有未删除规则。 */
+    @Test
+    void listRulesShouldReturnAllActiveRules() {
+        service = new AlertRuleService(ruleMapper, CLOCK);
+        when(ruleMapper.selectActiveRules()).thenReturn(List.of(
+                ruleEntity(1L, "cpu", ">", "80", "warning"),
+                ruleEntity(2L, "memory", ">=", "90", "critical")));
+
+        var rules = service.listRules();
+
+        assertEquals(2, rules.size());
+        assertEquals("cpu", rules.get(0).getMetric());
+        assertEquals("memory", rules.get(1).getMetric());
+    }
+
+    private AlertRuleEntity ruleEntity(Long id, String metric, String operator,
+            String threshold, String level) {
+        AlertRuleEntity entity = new AlertRuleEntity();
+        entity.setId(id);
+        entity.setServerId(1L);
+        entity.setMetric(metric);
+        entity.setOperator(operator);
+        entity.setThresholdValue(new BigDecimal(threshold));
+        entity.setLevel(level);
+        entity.setEnabled(true);
+        entity.setDeleted(false);
+        entity.setCreatedAt(LocalDateTime.now(CLOCK));
+        entity.setUpdatedAt(LocalDateTime.now(CLOCK));
+        return entity;
+    }
+}
