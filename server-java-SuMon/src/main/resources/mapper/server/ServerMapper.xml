@@ -143,6 +143,14 @@
           AND deleted = 0
     </select>
 
+    <select id="selectActiveServerForUpdateById" resultMap="ServerResultMap">
+        SELECT id, deleted
+        FROM servers
+        WHERE id = #{serverId}
+          AND deleted = 0
+        FOR UPDATE
+    </select>
+
     <select id="selectActiveServerWithCredentialsById" resultMap="ServerResultMap">
         SELECT
             id,

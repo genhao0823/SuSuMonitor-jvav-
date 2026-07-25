@@ -183,6 +183,8 @@ X-Correlation-ID: local-monitor-ticket
 
 # Agent 使用 data.agent_token 建立 ws://SERVER_IP_OR_DOMAIN/ws/agent；
 # Token 只放在 agent.authenticate 首帧 payload 中，不进入 URL、日志或版本控制文件。
+# metrics.report 示例：{"type":"metrics.report","message_id":"REPLACE_WITH_UUID","timestamp":"2026-07-25T12:00:00Z","payload":{"server_id":1,"collected_at":"2026-07-25T12:00:00Z","cpu_percent":35.2}}
+# 重试同一采样时必须复用原 message_id。message_id 重复会静默幂等；采样时间不严格递增会收到 error 40002。
 
 ### Metrics: latest fixed-width snapshot
 GET {{baseUrl}}/api/servers/{{serverId}}/metrics/latest

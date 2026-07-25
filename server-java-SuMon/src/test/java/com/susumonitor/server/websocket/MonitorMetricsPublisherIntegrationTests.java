@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susumonitor.server.module.metrics.dto.MetricsReportPayload;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
 import com.susumonitor.server.module.metrics.service.MetricsService;
+import com.susumonitor.server.module.server.entity.ServerEntity;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -18,6 +19,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,6 +63,7 @@ class MonitorMetricsPublisherIntegrationTests {
     void setUp() throws Exception {
         reset(metricsMapper, registry);
         when(metricsMapper.insertMetric(any())).thenReturn(1);
+        when(metricsMapper.insertIngestion(any())).thenReturn(1);
         socketSession = mock(WebSocketSession.class);
         when(socketSession.isOpen()).thenReturn(true);
         MonitorWebSocketSession subscriber = new MonitorWebSocketSession(socketSession, null);
@@ -70,7 +73,8 @@ class MonitorMetricsPublisherIntegrationTests {
     /** 验证事务提交后监听器发送一次 metrics.update。 */
     @Test
     void shouldBroadcastAfterTransactionCommits() throws Exception {
-        transactionTemplate.executeWithoutResult(status -> metricsService.report(SERVER_ID, payload()));
+        transactionTemplate.executeWithoutResult(status -> metricsService.report(
+                SERVER_ID, UUID.randomUUID().toString(), payload()));
 
         verify(socketSession).sendMessage(any(TextMessage.class));
     }
@@ -79,7 +83,7 @@ class MonitorMetricsPublisherIntegrationTests {
     @Test
     void shouldNotBroadcastWhenTransactionRollsBack() throws Exception {
         transactionTemplate.executeWithoutResult(status -> {
-            metricsService.report(SERVER_ID, payload());
+            metricsService.report(SERVER_ID, UUID.randomUUID().toString(), payload());
             status.setRollbackOnly();
         });
 
@@ -142,7 +146,9 @@ class MonitorMetricsPublisherIntegrationTests {
         /** 提供 Server Mapper 替身，满足 MetricsService 构造依赖。 */
         @Bean
         ServerMapper serverMapper() {
-            return mock(ServerMapper.class);
+            ServerMapper serverMapper = mock(ServerMapper.class);
+            when(serverMapper.selectActiveServerForUpdateById(SERVER_ID)).thenReturn(new ServerEntity());
+            return serverMapper;
         }
 
         /** 提供订阅注册表替身，观察广播是否发生。 */

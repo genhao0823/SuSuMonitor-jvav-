@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susumonitor.server.common.BusinessException;
 import com.susumonitor.server.common.ErrorCode;
 import com.susumonitor.server.module.server.entity.ServerEntity;
-import com.susumonitor.server.module.metrics.dto.MetricReportMessage;
+import com.susumonitor.server.module.metrics.dto.MetricsReportPayload;
 import com.susumonitor.server.module.metrics.service.MetricsService;
 import java.io.IOException;
 import java.time.Clock;
@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -87,9 +88,13 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
                 send(session.socketSession(), AgentMessageType.HEARTBEAT_ACK, agentMessage.messageId(),
                         ackPayload);
             } else if ("metrics.report".equals(agentMessage.type()) && session.authenticated()) {
-                MetricReportMessage report = objectMapper.treeToValue(
-                        objectMapper.valueToTree(agentMessage), MetricReportMessage.class);
-                metricsService.report(session.serverId(), report.getPayload());
+                if (!isUuid(agentMessage.messageId())) {
+                    sendError(session.socketSession(), null, ErrorCode.INVALID_REQUEST_PARAMETER);
+                    return;
+                }
+                MetricsReportPayload reportPayload = objectMapper.treeToValue(
+                        agentMessage.payload(), MetricsReportPayload.class);
+                metricsService.report(session.serverId(), agentMessage.messageId(), reportPayload);
             } else {
                 sendError(session.socketSession(), agentMessage.messageId(), ErrorCode.INVALID_REQUEST_PARAMETER);
             }
@@ -163,6 +168,19 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
                     .put("timestamp", OffsetDateTime.now(clock).toString())
                     .set("payload", payload).toString();
             session.sendMessage(new TextMessage(body));
+        }
+    }
+
+    /** metrics.report 使用 UUID 作为幂等键，格式无效时不进入指标事务。 */
+    private boolean isUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        try {
+            UUID.fromString(value);
+            return true;
+        } catch (IllegalArgumentException exception) {
+            return false;
         }
     }
 

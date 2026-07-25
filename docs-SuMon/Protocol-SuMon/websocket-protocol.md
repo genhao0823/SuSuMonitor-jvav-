@@ -43,7 +43,7 @@ Successful authentication returns `agent.authenticated` with payload `{"server_i
 
 The Agent message limit is 64 KiB. Invalid JSON uses close code `1007`; oversized messages use `1009`; policy/authentication failures use `1008`. The `error` message payload is `{"code": <int>, "message": "<string>"}`, where `code` uses the same numeric business error codes as the REST API (e.g. `40100` unauthorized, `40002` invalid request parameter).
 
-`metrics.report` contains one fixed-width `metrics` row, including `server_id`, `collected_at`, `cpu_percent`, `memory_percent`, `memory_used`, `memory_total`, `disk_percent`, `disk_used`, `disk_total`, `net_rx`, `net_tx`, `temperature`, and `load_avg`.
+`metrics.report` contains one fixed-width `metrics` row, including `server_id`, `collected_at`, `cpu_percent`, `memory_percent`, `memory_used`, `memory_total`, `disk_percent`, `disk_used`, `disk_total`, `net_rx`, `net_tx`, `temperature`, and `load_avg`. Its `message_id` is a required UUID idempotency key. Retrying one report must reuse its original `message_id`; a duplicate is silently accepted without inserting another row or publishing `metrics.update` or `alert.push`. For one server, accepted `collected_at` values must be strictly increasing. A report with a timestamp less than or equal to the most recently accepted sample is rejected with the standard `error` payload and code `40002`; it is not persisted and emits no event. `metrics.report` has no acknowledgement frame.
 
 ## Monitor Messages
 

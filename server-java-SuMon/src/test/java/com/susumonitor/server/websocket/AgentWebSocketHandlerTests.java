@@ -4,9 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -171,7 +173,7 @@ class AgentWebSocketHandlerTests {
         // 清除之前的消息捕获，发送心跳。
         org.mockito.Mockito.clearInvocations(socket);
         handler.handleTextMessage(socket, new TextMessage(
-                "{\"type\":\"heartbeat\",\"messageId\":\"hb-1\",\"payload\":{}}"));
+                "{\"type\":\"heartbeat\",\"message_id\":\"hb-1\",\"payload\":{}}"));
 
         org.mockito.ArgumentCaptor<TextMessage> captor =
                 org.mockito.ArgumentCaptor.forClass(TextMessage.class);
@@ -180,6 +182,66 @@ class AgentWebSocketHandlerTests {
         assertEquals("heartbeat.ack", payload.get("type").asText());
         assertEquals(3003, payload.get("payload").get("server_id").asInt());
         assertTrue(payload.get("payload").has("last_heartbeat_at"));
+    }
+
+    /** 验证 metrics.report 缺少 UUID message_id 时被拒绝，且不会进入 Metrics 写入服务。 */
+    @Test
+    void metricsReportWithoutMessageIdShouldBeRejected() throws Exception {
+        MutableClock clock = new MutableClock(CONNECTED_AT);
+        WebSocketSession socket = socket("agent-metrics-message-id");
+        AgentAuthenticationService authenticationService = mock(AgentAuthenticationService.class);
+        AgentHeartbeatService heartbeatService = mock(AgentHeartbeatService.class);
+        AgentConnectionRegistry registry = mock(AgentConnectionRegistry.class);
+        MetricsService metricsService = mock(MetricsService.class);
+        ServerEntity server = new ServerEntity();
+        server.setId(4004L);
+        when(authenticationService.authenticate(4004L, "test-token")).thenReturn(server);
+        when(registry.replace(any())).thenReturn(java.util.Optional.empty());
+        AgentWebSocketHandler handler = new AgentWebSocketHandler(new ObjectMapper().findAndRegisterModules(), authenticationService,
+                heartbeatService, registry, metricsService, clock);
+        handler.afterConnectionEstablished(socket);
+        handler.handleTextMessage(socket, new TextMessage(
+                "{\"type\":\"agent.authenticate\",\"payload\":{\"server_id\":4004,\"token\":\"test-token\"}}"));
+        org.mockito.Mockito.clearInvocations(socket);
+
+        handler.handleTextMessage(socket, new TextMessage("""
+                {"type":"metrics.report","payload":{"server_id":4004,"collected_at":"2026-07-22T00:00:00Z","cpu_percent":10}}
+                """));
+
+        org.mockito.ArgumentCaptor<TextMessage> captor =
+                org.mockito.ArgumentCaptor.forClass(TextMessage.class);
+        verify(socket).sendMessage(captor.capture());
+        JsonNode response = new ObjectMapper().readTree(captor.getValue().getPayload());
+        assertEquals("error", response.get("type").asText());
+        assertEquals(40002, response.get("payload").get("code").asInt());
+        verifyNoInteractions(metricsService);
+    }
+
+    /** 验证合法 metrics.report 原样传递 UUID 幂等键和载荷至 Metrics 服务。 */
+    @Test
+    void metricsReportShouldPassMessageIdToMetricsService() throws Exception {
+        MutableClock clock = new MutableClock(CONNECTED_AT);
+        WebSocketSession socket = socket("agent-metrics-report");
+        AgentAuthenticationService authenticationService = mock(AgentAuthenticationService.class);
+        AgentHeartbeatService heartbeatService = mock(AgentHeartbeatService.class);
+        AgentConnectionRegistry registry = mock(AgentConnectionRegistry.class);
+        MetricsService metricsService = mock(MetricsService.class);
+        ServerEntity server = new ServerEntity();
+        server.setId(5005L);
+        when(authenticationService.authenticate(5005L, "test-token")).thenReturn(server);
+        when(registry.replace(any())).thenReturn(java.util.Optional.empty());
+        AgentWebSocketHandler handler = new AgentWebSocketHandler(new ObjectMapper().findAndRegisterModules(), authenticationService,
+                heartbeatService, registry, metricsService, clock);
+        handler.afterConnectionEstablished(socket);
+        handler.handleTextMessage(socket, new TextMessage(
+                "{\"type\":\"agent.authenticate\",\"payload\":{\"server_id\":5005,\"token\":\"test-token\"}}"));
+        String messageId = "77b5244a-51ed-4c64-9ba8-7f54c68d0b08";
+
+        handler.handleTextMessage(socket, new TextMessage("""
+                {"type":"metrics.report","message_id":"77b5244a-51ed-4c64-9ba8-7f54c68d0b08","payload":{"server_id":5005,"collected_at":"2026-07-22T00:00:00Z","cpu_percent":10}}
+                """));
+
+        verify(metricsService).report(eq(5005L), eq(messageId), any());
     }
 
     private AgentWebSocketHandler handler(Clock clock) {

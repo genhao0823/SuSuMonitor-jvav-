@@ -1,6 +1,7 @@
 package com.susumonitor.server.websocket;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Agent WebSocket 统一消息结构。
@@ -12,6 +13,7 @@ import com.fasterxml.jackson.databind.JsonNode;
  */
 public record AgentMessage(
         String type,
+        @JsonProperty("message_id")
         String messageId,
         String timestamp,
         JsonNode payload) {

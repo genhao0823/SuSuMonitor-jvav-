@@ -86,6 +86,14 @@ public interface ServerMapper extends BaseMapper<ServerEntity> {
             @Param("serverId") Long serverId);
 
     /**
+     * 锁定有效服务器行，使同一服务器的指标乱序判定与写入在一个事务内串行执行。
+     *
+     * @param serverId 服务器 ID
+     * @return 已锁定的有效服务器，不存在时返回 null
+     */
+    ServerEntity selectActiveServerForUpdateById(@Param("serverId") Long serverId);
+
+    /**
      * 按 ID 查询内部更新所需业务字段和 SSH 凭据密文，不读取 Agent Token 哈希。
      *
      * @param serverId 服务器 ID

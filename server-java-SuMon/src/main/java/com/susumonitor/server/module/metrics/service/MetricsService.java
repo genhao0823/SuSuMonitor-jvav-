@@ -5,6 +5,7 @@ import com.susumonitor.server.common.ErrorCode;
 import com.susumonitor.server.common.vo.PageResult;
 import com.susumonitor.server.module.metrics.dto.MetricsReportPayload;
 import com.susumonitor.server.module.metrics.entity.MetricsEntity;
+import com.susumonitor.server.module.metrics.entity.MetricsIngestionEntity;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
 import com.susumonitor.server.module.metrics.vo.MetricsHistoryVo;
 import com.susumonitor.server.module.metrics.vo.MetricsLatestVo;
@@ -15,6 +16,8 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.UUID;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,11 +41,27 @@ public class MetricsService {
         this.eventPublisher = eventPublisher;
     }
 
-    /** 写入已认证 Agent 上报的一条完整宽表快照。 */
+    /**
+     * 写入已认证 Agent 上报的一条完整宽表快照。
+     *
+     * <p>同一服务器的写入先锁定服务器行，确保重复投递与采样时间判定串行化。
+     * 同一 messageId 重复投递静默成功；采样时间不严格晚于最后接受采样时拒绝，
+     * 因而不会触发重复 Metrics 事件、告警评估或 WebSocket 推送。</p>
+     */
     @Transactional
-    public void report(Long authenticatedServerId, MetricsReportPayload payload) {
-        validatePayload(authenticatedServerId, payload);
+    public void report(Long authenticatedServerId, String messageId, MetricsReportPayload payload) {
+        validatePayload(authenticatedServerId, messageId, payload);
+        if (serverMapper.selectActiveServerForUpdateById(authenticatedServerId) == null) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+        if (isDuplicateIngestion(authenticatedServerId, messageId, payload.getCollectedAt())) {
+            return;
+        }
         MetricsEntity entity = toEntity(payload);
+        LocalDateTime latestCollectedAt = metricsMapper.selectLatestCollectedAt(authenticatedServerId);
+        if (latestCollectedAt != null && !entity.getCollectedAt().isAfter(latestCollectedAt)) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST_PARAMETER);
+        }
         if (metricsMapper.insertMetric(entity) != 1) {
             throw new BusinessException(ErrorCode.DATABASE_ERROR);
         }
@@ -93,8 +112,21 @@ public class MetricsService {
         }
     }
 
-    private void validatePayload(Long authenticatedServerId, MetricsReportPayload payload) {
-        if (payload == null || authenticatedServerId == null
+    /** 将唯一消息 ID 登记为已接收；唯一键冲突代表 Agent 对同一消息的合法重试。 */
+    private boolean isDuplicateIngestion(Long serverId, String messageId, OffsetDateTime collectedAt) {
+        MetricsIngestionEntity ingestion = new MetricsIngestionEntity();
+        ingestion.setServerId(serverId);
+        ingestion.setMessageId(messageId);
+        ingestion.setCollectedAt(collectedAt.atZoneSameInstant(APPLICATION_ZONE).toLocalDateTime());
+        try {
+            return metricsMapper.insertIngestion(ingestion) != 1;
+        } catch (DuplicateKeyException exception) {
+            return true;
+        }
+    }
+
+    private void validatePayload(Long authenticatedServerId, String messageId, MetricsReportPayload payload) {
+        if (payload == null || authenticatedServerId == null || !isUuid(messageId)
                 || !authenticatedServerId.equals(payload.getServerId())
                 || payload.getCollectedAt() == null
                 || payload.getCollectedAt().isAfter(OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5))) {
@@ -115,6 +147,19 @@ public class MetricsService {
                 || payload.getDiskUsed() != null && payload.getDiskTotal() != null
                 && payload.getDiskUsed() > payload.getDiskTotal()) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST_PARAMETER);
+        }
+    }
+
+    /** UUID 是 Agent 至少一次投递的幂等键，格式无效时不能安全执行去重。 */
+    private boolean isUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        try {
+            UUID.fromString(value);
+            return true;
+        } catch (IllegalArgumentException exception) {
+            return false;
         }
     }
 
