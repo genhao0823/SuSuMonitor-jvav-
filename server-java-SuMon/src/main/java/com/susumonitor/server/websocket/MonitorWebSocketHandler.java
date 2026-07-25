@@ -3,12 +3,14 @@ package com.susumonitor.server.websocket;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susumonitor.server.common.ErrorCode;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import com.susumonitor.server.security.AuthenticatedUser;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
@@ -67,27 +69,34 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
             body = objectMapper.readTree(message.getPayload());
         } catch (JsonProcessingException exception) {
             // 一条格式错误的 JSON 不应让整个 Monitor 连接断开，回送错误帧后保留连接。
-            sendError(session, "invalid json");
+            sendError(session, null, ErrorCode.BAD_REQUEST);
             return;
         }
         String type = body == null || !body.has("type") || !body.get("type").isTextual()
                 ? "" : body.get("type").textValue();
+        // 从消息体提取 message_id，用于 error 帧关联客户端请求。
+        String messageId = body != null && body.has("message_id") && body.get("message_id").isTextual()
+                ? body.get("message_id").textValue() : null;
         // path 在缺失时返回 MissingNode 而非 null，用 isMissingNode 表意更清晰。
         JsonNode serverNode = body == null ? null : body.path("payload").path("server_id");
         if (serverNode == null || serverNode.isMissingNode()
                 || !serverNode.canConvertToLong() || serverNode.longValue() <= 0) {
+            // server_id 缺失或非法属于协议格式违规，发 error 帧后关闭连接。
+            sendError(session, messageId, ErrorCode.INVALID_REQUEST_PARAMETER);
             session.close(CloseStatus.BAD_DATA);
             return;
         }
         Long serverId = serverNode.longValue();
         if (serverMapper.selectActiveServerById(serverId) == null) {
-            session.close(CloseStatus.POLICY_VIOLATION);
+            // 服务器不存在，发 error 帧保留连接，供前端修正后重试。
+            sendError(session, messageId, ErrorCode.RESOURCE_NOT_FOUND);
             return;
         }
         // 当前授权策略：admin 或 approved 用户均可订阅，详见类注释。
         if (!"admin".equals(monitorSession.user().role())
                 && !"approved".equals(monitorSession.user().reviewStatus())) {
-            session.close(CloseStatus.POLICY_VIOLATION);
+            // 权限不足，发 error 帧保留连接。
+            sendError(session, messageId, ErrorCode.FORBIDDEN);
             return;
         }
         if ("metrics.subscribe".equals(type)) {
@@ -95,7 +104,8 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
         } else if ("metrics.unsubscribe".equals(type)) {
             registry.unsubscribe(monitorSession, serverId);
         } else {
-            session.close(CloseStatus.BAD_DATA);
+            // 未知消息类型，发 error 帧保留连接。
+            sendError(session, messageId, ErrorCode.BAD_REQUEST);
         }
     }
 
@@ -108,14 +118,23 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    /** 向 Monitor 连接回送错误帧，不关闭连接。 */
-    private void sendError(WebSocketSession session, String message) throws IOException {
+    /**
+     * 向 Monitor 连接回送带业务错误码的 error 帧，不关闭连接。
+     *
+     * @param session 目标 WebSocket 会话
+     * @param messageId 关联客户端消息 ID，没有则生成随机 UUID
+     * @param errorCode 业务错误码，payload 包含 code 和 message
+     * @throws IOException 发送失败
+     */
+    private void sendError(WebSocketSession session, String messageId, ErrorCode errorCode) throws IOException {
         if (session.isOpen()) {
             String body = objectMapper.createObjectNode()
                     .put("type", "error")
-                    .put("message_id", java.util.UUID.randomUUID().toString())
+                    .put("message_id", messageId != null ? messageId : UUID.randomUUID().toString())
                     .put("timestamp", OffsetDateTime.now(clock).toString())
-                    .set("payload", objectMapper.createObjectNode().put("message", message))
+                    .set("payload", objectMapper.createObjectNode()
+                            .put("code", errorCode.getCode())
+                            .put("message", errorCode.getMessage()))
                     .toString();
             session.sendMessage(new TextMessage(body));
         }

@@ -3,6 +3,7 @@ package com.susumonitor.server.websocket;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susumonitor.server.common.BusinessException;
+import com.susumonitor.server.common.ErrorCode;
 import com.susumonitor.server.module.server.entity.ServerEntity;
 import com.susumonitor.server.module.metrics.dto.MetricReportMessage;
 import com.susumonitor.server.module.metrics.service.MetricsService;
@@ -12,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
@@ -78,17 +80,21 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
                 authenticate(session, agentMessage.payload());
             } else if (AgentMessageType.HEARTBEAT.value().equals(agentMessage.type()) && session.authenticated()) {
                 heartbeatService.heartbeat(session);
+                // 冻结 heartbeat.ack payload，返回确认的心跳时间，供 Agent 校验心跳周期。
+                var ackPayload = objectMapper.createObjectNode()
+                        .put("server_id", session.serverId())
+                        .put("last_heartbeat_at", session.lastHeartbeatAt().atOffset(ZoneOffset.UTC).toString());
                 send(session.socketSession(), AgentMessageType.HEARTBEAT_ACK, agentMessage.messageId(),
-                        objectMapper.createObjectNode());
+                        ackPayload);
             } else if ("metrics.report".equals(agentMessage.type()) && session.authenticated()) {
                 MetricReportMessage report = objectMapper.treeToValue(
                         objectMapper.valueToTree(agentMessage), MetricReportMessage.class);
                 metricsService.report(session.serverId(), report.getPayload());
             } else {
-                sendError(session.socketSession(), agentMessage.messageId(), "invalid agent message state");
+                sendError(session.socketSession(), agentMessage.messageId(), ErrorCode.INVALID_REQUEST_PARAMETER);
             }
         } catch (BusinessException exception) {
-            sendError(socketSession, null, exception.getErrorCode().getMessage());
+            sendError(socketSession, null, exception.getErrorCode());
             if (!session.authenticated()) {
                 close(socketSession, CloseStatus.POLICY_VIOLATION);
             }
@@ -96,9 +102,9 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
             // 心跳目标不可用等运行时状态异常单独处理，不误报为消息格式错误，也不关闭已认证连接。
             log.warn("agent runtime state error, sessionId={}, message={}", socketSession.getId(),
                     exception.getMessage());
-            sendError(socketSession, null, "agent runtime state error");
+            sendError(socketSession, null, ErrorCode.INTERNAL_SERVER_ERROR);
         } catch (Exception exception) {
-            sendError(socketSession, null, "invalid agent message");
+            sendError(socketSession, null, ErrorCode.BAD_REQUEST);
             close(socketSession, CloseStatus.BAD_DATA);
         }
     }
@@ -127,7 +133,11 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
         // 注册前校验连接仍在，避免把已关闭会话注册进 registry。
         if (session.socketSession().isOpen()) {
             connectionRegistry.replace(session).ifPresent(old -> close(old.socketSession(), CloseStatus.NORMAL));
-            send(session.socketSession(), AgentMessageType.AGENT_AUTHENTICATED, null, objectMapper.createObjectNode());
+            // 冻结 agent.authenticated payload，返回 server_id 和认证时间，供 Agent 校验绑定。
+            var authPayload = objectMapper.createObjectNode()
+                    .put("server_id", server.getId())
+                    .put("authenticated_at", OffsetDateTime.now(clock).toString());
+            send(session.socketSession(), AgentMessageType.AGENT_AUTHENTICATED, null, authPayload);
         }
     }
 
@@ -156,9 +166,19 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    private void sendError(WebSocketSession session, String messageId, String message) throws IOException {
+    /**
+     * 发送带业务错误码的 error 帧，供 Agent 客户端按 code 做稳定恢复。
+     *
+     * @param session 目标 WebSocket 会话
+     * @param messageId 关联客户端消息 ID，没有则为 null
+     * @param errorCode 业务错误码，payload 包含 code 和 message
+     * @throws IOException 发送失败
+     */
+    private void sendError(WebSocketSession session, String messageId, ErrorCode errorCode) throws IOException {
         send(session, AgentMessageType.ERROR, messageId,
-                objectMapper.createObjectNode().put("message", message));
+                objectMapper.createObjectNode()
+                        .put("code", errorCode.getCode())
+                        .put("message", errorCode.getMessage()));
     }
 
     private void close(WebSocketSession session, CloseStatus status) {
