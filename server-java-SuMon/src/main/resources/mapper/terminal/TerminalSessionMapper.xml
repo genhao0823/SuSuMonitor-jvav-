@@ -49,6 +49,12 @@
         ORDER BY created_at ASC, id ASC
     </select>
 
+    <select id="selectAllActive" resultMap="TerminalSessionResultMap">
+        SELECT <include refid="TerminalSessionColumns"/> FROM terminal_sessions
+        WHERE status IN ('opening', 'open')
+        ORDER BY created_at ASC, id ASC
+    </select>
+
     <update id="markOpened">
         UPDATE terminal_sessions
         SET status = 'open', shell_identifier = #{shellIdentifier}, opened_at = #{openedAt},

@@ -38,6 +38,10 @@ public class AppProperties {
     @Valid
     private final Metrics metrics = new Metrics();
 
+    /** 终端会话的单 JVM 资源和超时边界。 */
+    @Valid
+    private final Terminal terminal = new Terminal();
+
     // 递归校验 CORS 允许的前端 Origin 白名单。
     @Valid
     private final Cors cors = new Cors();
@@ -60,6 +64,10 @@ public class AppProperties {
 
     public Metrics getMetrics() {
         return metrics;
+    }
+
+    public Terminal getTerminal() {
+        return terminal;
     }
 
     public Cors getCors() {
@@ -387,6 +395,37 @@ public class AppProperties {
         public void setCleanupMaxBatchesPerRun(int cleanupMaxBatchesPerRun) {
             this.cleanupMaxBatchesPerRun = cleanupMaxBatchesPerRun;
         }
+    }
+
+    /** 终端会话资源限制，首版仅在单 JVM 中生效。 */
+    public static class Terminal {
+
+        @Min(value = 1, message = "Terminal per-user session limit must be at least one")
+        @Max(value = 20, message = "Terminal per-user session limit must not exceed 20")
+        private int maxSessionsPerUser = 2;
+        @Min(value = 1, message = "Terminal per-server session limit must be at least one")
+        @Max(value = 100, message = "Terminal per-server session limit must not exceed 100")
+        private int maxSessionsPerServer = 4;
+        @Min(value = 1, message = "Terminal global session limit must be at least one")
+        @Max(value = 1024, message = "Terminal global session limit must not exceed 1024")
+        private int maxSessions = 16;
+        @Min(value = 1, message = "Terminal idle timeout must be at least one minute")
+        @Max(value = 1440, message = "Terminal idle timeout must not exceed one day")
+        private int idleTimeoutMinutes = 20;
+        @Min(value = 1, message = "Terminal maximum session duration must be at least one hour")
+        @Max(value = 168, message = "Terminal maximum session duration must not exceed one week")
+        private int maxSessionHours = 8;
+
+        public int getMaxSessionsPerUser() { return maxSessionsPerUser; }
+        public void setMaxSessionsPerUser(int value) { maxSessionsPerUser = value; }
+        public int getMaxSessionsPerServer() { return maxSessionsPerServer; }
+        public void setMaxSessionsPerServer(int value) { maxSessionsPerServer = value; }
+        public int getMaxSessions() { return maxSessions; }
+        public void setMaxSessions(int value) { maxSessions = value; }
+        public int getIdleTimeoutMinutes() { return idleTimeoutMinutes; }
+        public void setIdleTimeoutMinutes(int value) { idleTimeoutMinutes = value; }
+        public int getMaxSessionHours() { return maxSessionHours; }
+        public void setMaxSessionHours(int value) { maxSessionHours = value; }
     }
 
     /**

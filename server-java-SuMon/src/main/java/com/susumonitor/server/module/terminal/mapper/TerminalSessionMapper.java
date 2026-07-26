@@ -28,6 +28,9 @@ public interface TerminalSessionMapper {
     /** 查询指定用户仍未关闭的会话，用于审核状态变化时收口。 */
     List<TerminalSessionEntity> selectActiveByUserId(@Param("userId") Long userId);
 
+    /** 查询所有未关闭会话，用于单 JVM 全局限额和超时收口。 */
+    List<TerminalSessionEntity> selectAllActive();
+
     /** Agent 确认 PTY 创建时将 opening 原子转换为 open。 */
     int markOpened(@Param("sessionId") String sessionId, @Param("shellIdentifier") String shellIdentifier,
             @Param("openedAt") LocalDateTime openedAt);
