@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -33,33 +35,60 @@ import org.springframework.scheduling.annotation.Scheduled;
 public class AgentWebSocketHandler extends TextWebSocketHandler {
 
     private static final int MAX_MESSAGE_BYTES = 64 * 1024;
+    private static final Duration ERROR_CLOSE_DELAY = Duration.ofMillis(50);
     private final ObjectMapper objectMapper;
     private final AgentAuthenticationService authenticationService;
     private final AgentHeartbeatService heartbeatService;
     private final AgentConnectionRegistry connectionRegistry;
     private final MetricsService metricsService;
     private final Clock clock;
+    private final AgentConnectionLimiter connectionLimiter;
+    private final AgentMessageRateLimiter messageRateLimiter;
+    private final TaskScheduler taskScheduler;
     private final Map<String, AgentWebSocketSession> pendingSessions = new ConcurrentHashMap<>();
 
-    /** 注入 JSON、鉴权、心跳和连接注册依赖。 */
+    /** 注入生产运行所需 JSON、鉴权、心跳、连接和资源限制依赖。 */
+    @Autowired
     public AgentWebSocketHandler(
             ObjectMapper objectMapper,
             AgentAuthenticationService authenticationService,
             AgentHeartbeatService heartbeatService,
             AgentConnectionRegistry connectionRegistry,
             MetricsService metricsService,
-            Clock clock) {
+            Clock clock,
+            AgentConnectionLimiter connectionLimiter,
+            AgentMessageRateLimiter messageRateLimiter,
+            TaskScheduler taskScheduler) {
         this.objectMapper = objectMapper;
         this.authenticationService = authenticationService;
         this.heartbeatService = heartbeatService;
         this.connectionRegistry = connectionRegistry;
         this.metricsService = metricsService;
         this.clock = clock;
+        this.connectionLimiter = connectionLimiter;
+        this.messageRateLimiter = messageRateLimiter;
+        this.taskScheduler = taskScheduler;
+    }
+
+    /** 保留单元测试构造入口；生产 Spring 注入使用包含资源限制器的唯一构造器。 */
+    AgentWebSocketHandler(ObjectMapper objectMapper, AgentAuthenticationService authenticationService,
+            AgentHeartbeatService heartbeatService, AgentConnectionRegistry connectionRegistry,
+            MetricsService metricsService, Clock clock) {
+        this(objectMapper, authenticationService, heartbeatService, connectionRegistry, metricsService, clock,
+                null, null, null);
     }
 
     /** 保存新连接，等待其发送首帧认证。 */
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
+        if (connectionLimiter != null && !connectionLimiter.admit(session.getId())) {
+            try {
+                sendErrorAndClose(session, null, ErrorCode.AGENT_CONNECTION_LIMIT_REACHED);
+            } catch (IOException exception) {
+                close(session, CloseStatus.POLICY_VIOLATION);
+            }
+            return;
+        }
         pendingSessions.put(session.getId(), new AgentWebSocketSession(session, clock));
     }
 
@@ -80,6 +109,11 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
             if (AgentMessageType.AGENT_AUTHENTICATE.value().equals(agentMessage.type())) {
                 authenticate(session, agentMessage.payload());
             } else if (AgentMessageType.HEARTBEAT.value().equals(agentMessage.type()) && session.authenticated()) {
+                if (messageRateLimiter != null && !messageRateLimiter.allowHeartbeat(session.sessionId())) {
+                    sendErrorAndClose(session.socketSession(), agentMessage.messageId(),
+                            ErrorCode.AGENT_MESSAGE_RATE_LIMIT_REACHED);
+                    return;
+                }
                 heartbeatService.heartbeat(session);
                 // 冻结 heartbeat.ack payload，返回确认的心跳时间，供 Agent 校验心跳周期。
                 var ackPayload = objectMapper.createObjectNode()
@@ -88,6 +122,11 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
                 send(session.socketSession(), AgentMessageType.HEARTBEAT_ACK, agentMessage.messageId(),
                         ackPayload);
             } else if ("metrics.report".equals(agentMessage.type()) && session.authenticated()) {
+                if (messageRateLimiter != null && !messageRateLimiter.allowMetrics(session.sessionId())) {
+                    sendErrorAndClose(session.socketSession(), agentMessage.messageId(),
+                            ErrorCode.AGENT_MESSAGE_RATE_LIMIT_REACHED);
+                    return;
+                }
                 if (!isUuid(agentMessage.messageId())) {
                     sendError(session.socketSession(), null, ErrorCode.INVALID_REQUEST_PARAMETER);
                     return;
@@ -121,6 +160,12 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
         if (session != null && session.authenticated()) {
             connectionRegistry.remove(session);
         }
+        if (connectionLimiter != null) {
+            connectionLimiter.release(socketSession.getId());
+        }
+        if (messageRateLimiter != null) {
+            messageRateLimiter.release(socketSession.getId());
+        }
     }
 
     private void authenticate(AgentWebSocketSession session, JsonNode payload) throws IOException {
@@ -134,6 +179,9 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
         Long serverId = payload.get("server_id").longValue();
         ServerEntity server = authenticationService.authenticate(serverId, payload.get("token").textValue());
         session.authenticate(server.getId(), LocalDateTime.now(clock));
+        if (connectionLimiter != null) {
+            connectionLimiter.authenticate(session.sessionId());
+        }
         heartbeatService.heartbeat(session);
         // 注册前校验连接仍在，避免把已关闭会话注册进 registry。
         if (session.socketSession().isOpen()) {
@@ -197,6 +245,18 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
                 objectMapper.createObjectNode()
                         .put("code", errorCode.getCode())
                         .put("message", errorCode.getMessage()));
+    }
+
+    /** 速率超限后先返回稳定业务码，再关闭连接以阻止持续解析和数据库访问。 */
+    private void sendErrorAndClose(WebSocketSession session, String messageId, ErrorCode errorCode) throws IOException {
+        sendError(session, messageId, errorCode);
+        // Tomcat 异步写入 WebSocket 帧，延迟关闭确保客户端先接收可恢复的业务码。
+        if (taskScheduler != null) {
+            taskScheduler.schedule(() -> close(session, CloseStatus.POLICY_VIOLATION),
+                    Instant.now(clock).plus(ERROR_CLOSE_DELAY));
+            return;
+        }
+        close(session, CloseStatus.POLICY_VIOLATION);
     }
 
     private void close(WebSocketSession session, CloseStatus status) {

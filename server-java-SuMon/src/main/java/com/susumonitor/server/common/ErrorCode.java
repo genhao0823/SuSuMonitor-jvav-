@@ -19,6 +19,8 @@ public enum ErrorCode {
     SSH_HOST_KEY_MISMATCH(40902, "ssh host key mismatch", HttpStatus.CONFLICT),
     SSH_TARGET_FORBIDDEN(40301, "ssh target forbidden", HttpStatus.FORBIDDEN),
     SSH_CONNECTION_LIMIT_REACHED(42900, "ssh connection limit reached", HttpStatus.TOO_MANY_REQUESTS),
+    AGENT_CONNECTION_LIMIT_REACHED(42901, "agent connection limit reached", HttpStatus.TOO_MANY_REQUESTS),
+    AGENT_MESSAGE_RATE_LIMIT_REACHED(42902, "agent message rate limit reached", HttpStatus.TOO_MANY_REQUESTS),
     INTERNAL_SERVER_ERROR(50000, "internal server error", HttpStatus.INTERNAL_SERVER_ERROR),
     DATABASE_ERROR(50001, "database error", HttpStatus.INTERNAL_SERVER_ERROR),
     SSH_CONNECTION_FAILED(50002, "ssh connection failed", HttpStatus.BAD_GATEWAY),

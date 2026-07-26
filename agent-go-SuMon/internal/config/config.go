@@ -44,13 +44,23 @@ type Config struct {
 //   - SUSUMONITOR_LOG_LEVEL
 func Load() (*Config, error) {
 	cfg := &Config{
-		BackendURL:              os.Getenv("SUSUMONITOR_BACKEND_URL"),
-		AgentToken:              os.Getenv("SUSUMONITOR_AGENT_TOKEN"),
-		LogLevel:                getenvDefault("SUSUMONITOR_LOG_LEVEL", "info"),
-		CollectIntervalSeconds:  getenvIntDefault("SUSUMONITOR_COLLECT_INTERVAL_SECONDS", 5),
-		HeartbeatIntervalSeconds: getenvIntDefault("SUSUMONITOR_HEARTBEAT_INTERVAL_SECONDS", 30),
-		ReconnectInitialSeconds: getenvIntDefault("SUSUMONITOR_RECONNECT_INITIAL_SECONDS", 5),
-		ReconnectMaxSeconds:     getenvIntDefault("SUSUMONITOR_RECONNECT_MAX_SECONDS", 60),
+		BackendURL: os.Getenv("SUSUMONITOR_BACKEND_URL"),
+		AgentToken: os.Getenv("SUSUMONITOR_AGENT_TOKEN"),
+		LogLevel:   getenvDefault("SUSUMONITOR_LOG_LEVEL", "info"),
+	}
+
+	var err error
+	if cfg.CollectIntervalSeconds, err = getenvIntDefault("SUSUMONITOR_COLLECT_INTERVAL_SECONDS", 5); err != nil {
+		return nil, err
+	}
+	if cfg.HeartbeatIntervalSeconds, err = getenvIntDefault("SUSUMONITOR_HEARTBEAT_INTERVAL_SECONDS", 30); err != nil {
+		return nil, err
+	}
+	if cfg.ReconnectInitialSeconds, err = getenvIntDefault("SUSUMONITOR_RECONNECT_INITIAL_SECONDS", 5); err != nil {
+		return nil, err
+	}
+	if cfg.ReconnectMaxSeconds, err = getenvIntDefault("SUSUMONITOR_RECONNECT_MAX_SECONDS", 60); err != nil {
+		return nil, err
 	}
 
 	serverID, err := getenvInt64("SUSUMONITOR_SERVER_ID")
@@ -111,17 +121,20 @@ func getenvDefault(key, def string) string {
 	return v
 }
 
-// getenvIntDefault 读取环境变量为 int，为空时返回默认值。
-func getenvIntDefault(key string, def int) int {
+// getenvIntDefault 读取环境变量为 int，未设置时返回默认值，设置但无法解析时返回错误。
+//
+// 区分“缺省”与“非法值”：缺省使用默认值保证开箱即用；非法值显式报错，
+// 避免 Agent 因配置拼写错误而静默回退默认值，导致启动行为不符合预期。
+func getenvIntDefault(key string, def int) (int, error) {
 	v := os.Getenv(key)
 	if v == "" {
-		return def
+		return def, nil
 	}
 	n, err := strconv.Atoi(v)
 	if err != nil {
-		return def
+		return 0, fmt.Errorf("%s must be an integer, got %q", key, v)
 	}
-	return n
+	return n, nil
 }
 
 // getenvInt64 读取环境变量为 int64，为空或非法时返回错误。

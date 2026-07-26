@@ -1,0 +1,19 @@
+[Unit]
+Description=SuSuMonitor Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=susumonitor
+Group=susumonitor
+ExecStart=/usr/local/bin/susumonitor-agent
+EnvironmentFile=/etc/susumonitor/agent.env
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/susumonitor/agent.log
+StandardError=append:/var/log/susumonitor/agent.log
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

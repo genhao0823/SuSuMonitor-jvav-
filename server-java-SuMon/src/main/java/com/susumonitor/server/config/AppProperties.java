@@ -112,12 +112,127 @@ public class AppProperties {
 
         private String registerKey;
 
+        /** 限制单 JVM 已接纳的 Agent WebSocket 总连接数，防止异常建连耗尽内存。 */
+        @Min(value = 1, message = "Agent connection limit must be at least one")
+        @Max(value = 1024, message = "Agent connection limit must not exceed 1024")
+        private int maxConnections = 128;
+
+        /** 限制等待首帧认证的连接数，降低未认证连接占用资源的风险。 */
+        @Min(value = 1, message = "Agent unauthenticated connection limit must be at least one")
+        @Max(value = 1024, message = "Agent unauthenticated connection limit must not exceed 1024")
+        private int maxUnauthenticatedConnections = 32;
+
+        /** 限制单 JVM 内保留的客户端 IP 限流状态数，避免随机 IP 使状态表无界增长。 */
+        @Min(value = 1, message = "Agent tracked client IP limit must be at least one")
+        @Max(value = 100000, message = "Agent tracked client IP limit must not exceed 100000")
+        private int maxTrackedClientIps = 4096;
+
+        /** 限制同一客户端 IP 每分钟可发起的 WebSocket 握手次数。 */
+        @Min(value = 1, message = "Agent handshake rate must be at least one per minute")
+        @Max(value = 10000, message = "Agent handshake rate must not exceed 10000 per minute")
+        private int handshakeRatePerMinute = 10;
+
+        /** 限制每个已认证会话每分钟可发送的心跳数。 */
+        @Min(value = 1, message = "Agent heartbeat rate must be at least one per minute")
+        @Max(value = 10000, message = "Agent heartbeat rate must not exceed 10000 per minute")
+        private int heartbeatRatePerMinute = 12;
+
+        /** 允许短时心跳抖动的突发令牌数。 */
+        @Min(value = 1, message = "Agent heartbeat burst must be at least one")
+        @Max(value = 10000, message = "Agent heartbeat burst must not exceed 10000")
+        private int heartbeatBurst = 3;
+
+        /** 限制每个已认证会话每分钟可发送的指标消息数。 */
+        @Min(value = 1, message = "Agent metrics rate must be at least one per minute")
+        @Max(value = 10000, message = "Agent metrics rate must not exceed 10000 per minute")
+        private int metricsRatePerMinute = 24;
+
+        /** 允许短时 Metrics 采集抖动的突发令牌数。 */
+        @Min(value = 1, message = "Agent metrics burst must be at least one")
+        @Max(value = 10000, message = "Agent metrics burst must not exceed 10000")
+        private int metricsBurst = 6;
+
+        /** 仅信任列表内反向代理转发的客户端 IP，空列表时始终使用 TCP peer IP。 */
+        private List<String> trustedProxyCidrs = new ArrayList<>();
+
         public String getRegisterKey() {
             return registerKey;
         }
 
         public void setRegisterKey(String registerKey) {
             this.registerKey = registerKey;
+        }
+
+        public int getMaxConnections() {
+            return maxConnections;
+        }
+
+        public void setMaxConnections(int maxConnections) {
+            this.maxConnections = maxConnections;
+        }
+
+        public int getMaxUnauthenticatedConnections() {
+            return maxUnauthenticatedConnections;
+        }
+
+        public void setMaxUnauthenticatedConnections(int maxUnauthenticatedConnections) {
+            this.maxUnauthenticatedConnections = maxUnauthenticatedConnections;
+        }
+
+        public int getMaxTrackedClientIps() {
+            return maxTrackedClientIps;
+        }
+
+        public void setMaxTrackedClientIps(int maxTrackedClientIps) {
+            this.maxTrackedClientIps = maxTrackedClientIps;
+        }
+
+        public int getHandshakeRatePerMinute() {
+            return handshakeRatePerMinute;
+        }
+
+        public void setHandshakeRatePerMinute(int handshakeRatePerMinute) {
+            this.handshakeRatePerMinute = handshakeRatePerMinute;
+        }
+
+        public int getHeartbeatRatePerMinute() {
+            return heartbeatRatePerMinute;
+        }
+
+        public void setHeartbeatRatePerMinute(int heartbeatRatePerMinute) {
+            this.heartbeatRatePerMinute = heartbeatRatePerMinute;
+        }
+
+        public int getHeartbeatBurst() {
+            return heartbeatBurst;
+        }
+
+        public void setHeartbeatBurst(int heartbeatBurst) {
+            this.heartbeatBurst = heartbeatBurst;
+        }
+
+        public int getMetricsRatePerMinute() {
+            return metricsRatePerMinute;
+        }
+
+        public void setMetricsRatePerMinute(int metricsRatePerMinute) {
+            this.metricsRatePerMinute = metricsRatePerMinute;
+        }
+
+        public int getMetricsBurst() {
+            return metricsBurst;
+        }
+
+        public void setMetricsBurst(int metricsBurst) {
+            this.metricsBurst = metricsBurst;
+        }
+
+        public List<String> getTrustedProxyCidrs() {
+            return trustedProxyCidrs;
+        }
+
+        public void setTrustedProxyCidrs(List<String> trustedProxyCidrs) {
+            this.trustedProxyCidrs = trustedProxyCidrs;
         }
     }
 

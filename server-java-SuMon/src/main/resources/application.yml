@@ -39,6 +39,15 @@ susumonitor:
     aes-gcm-key: ${AES_GCM_KEY:}
   agent:
     register-key: ${AGENT_REGISTER_KEY:}
+    max-connections: ${AGENT_MAX_CONNECTIONS:128}
+    max-unauthenticated-connections: ${AGENT_MAX_UNAUTHENTICATED_CONNECTIONS:32}
+    max-tracked-client-ips: ${AGENT_MAX_TRACKED_CLIENT_IPS:4096}
+    handshake-rate-per-minute: ${AGENT_HANDSHAKE_RATE_PER_MINUTE:10}
+    heartbeat-rate-per-minute: ${AGENT_HEARTBEAT_RATE_PER_MINUTE:12}
+    heartbeat-burst: ${AGENT_HEARTBEAT_BURST:3}
+    metrics-rate-per-minute: ${AGENT_METRICS_RATE_PER_MINUTE:24}
+    metrics-burst: ${AGENT_METRICS_BURST:6}
+    trusted-proxy-cidrs: ${AGENT_TRUSTED_PROXY_CIDRS:}
   ssh:
     connect-timeout-seconds: ${SSH_CONNECT_TIMEOUT_SECONDS:10}
     socket-timeout-seconds: ${SSH_SOCKET_TIMEOUT_SECONDS:15}

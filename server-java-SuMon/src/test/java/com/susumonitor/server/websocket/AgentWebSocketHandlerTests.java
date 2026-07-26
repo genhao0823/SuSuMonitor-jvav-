@@ -13,6 +13,8 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susumonitor.server.common.ErrorCode;
+import com.susumonitor.server.config.AppProperties;
 import com.susumonitor.server.module.metrics.service.MetricsService;
 import com.susumonitor.server.module.server.entity.ServerEntity;
 import java.io.IOException;
@@ -29,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
+import org.springframework.scheduling.TaskScheduler;
 
 /** 验证 Agent 首帧十秒超时边界、认证中会话保护、error 帧含 code 和 authenticated/ack payload 冻结。 */
 class AgentWebSocketHandlerTests {
@@ -242,6 +245,29 @@ class AgentWebSocketHandlerTests {
                 """));
 
         verify(metricsService).report(eq(5005L), eq(messageId), any());
+    }
+
+    /** 验证已建立连接因总连接配额耗尽时返回 42901 并以策略违规关闭。 */
+    @Test
+    void connectionLimitShouldSendErrorAndClose() throws Exception {
+        WebSocketSession admittedSocket = socket("agent-admitted");
+        WebSocketSession rejectedSocket = socket("agent-rejected");
+        AppProperties properties = new AppProperties();
+        properties.getAgent().setMaxConnections(1);
+        properties.getAgent().setMaxUnauthenticatedConnections(1);
+        AgentWebSocketHandler handler = new AgentWebSocketHandler(new ObjectMapper(),
+                mock(AgentAuthenticationService.class), mock(AgentHeartbeatService.class),
+                mock(AgentConnectionRegistry.class), mock(MetricsService.class), Clock.systemUTC(),
+                new AgentConnectionLimiter(properties), new AgentMessageRateLimiter(properties, Clock.systemUTC()), null);
+
+        handler.afterConnectionEstablished(admittedSocket);
+        handler.afterConnectionEstablished(rejectedSocket);
+
+        org.mockito.ArgumentCaptor<TextMessage> captor = org.mockito.ArgumentCaptor.forClass(TextMessage.class);
+        verify(rejectedSocket).sendMessage(captor.capture());
+        JsonNode response = new ObjectMapper().readTree(captor.getValue().getPayload());
+        assertEquals(ErrorCode.AGENT_CONNECTION_LIMIT_REACHED.getCode(), response.get("payload").get("code").asInt());
+        verify(rejectedSocket).close(CloseStatus.POLICY_VIOLATION);
     }
 
     private AgentWebSocketHandler handler(Clock clock) {

@@ -41,7 +41,7 @@ The first Agent message must be `agent.authenticate`:
 
 Successful authentication returns `agent.authenticated` with payload `{"server_id": <id>, "authenticated_at": "<UTC ISO-8601>"}`. Authentication expires after 10 seconds if no valid first frame is received. A valid heartbeat updates `servers.last_heartbeat_at` and `agent_status=online`. The `heartbeat.ack` response payload is `{"server_id": <id>, "last_heartbeat_at": "<UTC ISO-8601>"}`. No heartbeat for 90 seconds marks the Agent offline. A newly authenticated connection replaces the previous connection for the same server.
 
-The Agent message limit is 64 KiB. Invalid JSON uses close code `1007`; oversized messages use `1009`; policy/authentication failures use `1008`. The `error` message payload is `{"code": <int>, "message": "<string>"}`, where `code` uses the same numeric business error codes as the REST API (e.g. `40100` unauthorized, `40002` invalid request parameter).
+The Agent message limit is 64 KiB. Invalid JSON uses close code `1007`; oversized messages use `1009`; policy/authentication failures use `1008`. The `error` message payload is `{"code": <int>, "message": "<string>"}`, where `code` uses the same numeric business error codes as the REST API (e.g. `40100` unauthorized, `40002` invalid request parameter). A connection or unauthenticated-session limit returns `42901` and closes with `1008`; heartbeat or metrics rate exhaustion returns `42902` followed by `1008`. Agent upgrade requests are limited per resolved client IP and receive HTTP `429` with `Retry-After: 60` before a WebSocket is created.
 
 `metrics.report` contains one fixed-width `metrics` row, including `server_id`, `collected_at`, `cpu_percent`, `memory_percent`, `memory_used`, `memory_total`, `disk_percent`, `disk_used`, `disk_total`, `net_rx`, `net_tx`, `temperature`, and `load_avg`. Its `message_id` is a required UUID idempotency key. Retrying one report must reuse its original `message_id`; a duplicate is silently accepted without inserting another row or publishing `metrics.update` or `alert.push`. For one server, accepted `collected_at` values must be strictly increasing. A report with a timestamp less than or equal to the most recently accepted sample is rejected with the standard `error` payload and code `40002`; it is not persisted and emits no event. `metrics.report` has no acknowledgement frame.
 
@@ -83,6 +83,7 @@ The broadcast never contains Agent Token, Token hash, SSH credentials, database 
 - Metrics broadcast runs after the database transaction commits.
 - Disconnect removes all subscriptions.
 - Tokens and complete raw messages must not be logged.
+- Agent client IP defaults to the TCP peer address. `X-Forwarded-For` is used only when the TCP peer is within `AGENT_TRUSTED_PROXY_CIDRS`; the resolver strips trusted proxies from right to left and never trusts a direct client header.
 
 ## Error Messages
 

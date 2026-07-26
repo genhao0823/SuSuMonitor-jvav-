@@ -13,10 +13,13 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 public class AgentWebSocketConfig implements WebSocketConfigurer {
 
     private final AgentWebSocketHandler agentWebSocketHandler;
+    private final AgentHandshakeInterceptor agentHandshakeInterceptor;
 
     /** 注入 Agent WebSocket Handler。 */
-    public AgentWebSocketConfig(AgentWebSocketHandler agentWebSocketHandler) {
+    public AgentWebSocketConfig(AgentWebSocketHandler agentWebSocketHandler,
+            AgentHandshakeInterceptor agentHandshakeInterceptor) {
         this.agentWebSocketHandler = agentWebSocketHandler;
+        this.agentHandshakeInterceptor = agentHandshakeInterceptor;
     }
 
     /**
@@ -29,6 +32,7 @@ public class AgentWebSocketConfig implements WebSocketConfigurer {
      */
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(agentWebSocketHandler, "/ws/agent");
+        registry.addHandler(agentWebSocketHandler, "/ws/agent")
+                .addInterceptors(agentHandshakeInterceptor);
     }
 }

@@ -57,12 +57,12 @@ class ServerMapperMySqlValidationIT {
     @Test
     void selectActiveServersShouldSortBeforeApplyingPagination() {
         withTestRows(() -> {
-            List<String> firstPage = names(serverMapper.selectActiveServers(null, 0L, 2, "name", "asc"));
-            List<String> secondPage = names(serverMapper.selectActiveServers(null, 2L, 2, "name", "asc"));
+            List<String> firstPage = names(serverMapper.selectActiveServers(TEST_PREFIX, 0L, 2, "name", "asc"));
+            List<String> secondPage = names(serverMapper.selectActiveServers(TEST_PREFIX, 2L, 2, "name", "asc"));
 
             assertEquals(List.of("alpha", "bravo"), firstPage);
             assertEquals(List.of("charlie"), secondPage);
-            assertEquals(3L, serverMapper.countActiveServers(null));
+            assertEquals(3L, serverMapper.countActiveServers(TEST_PREFIX));
         });
     }
 
@@ -150,7 +150,7 @@ class ServerMapperMySqlValidationIT {
 
     /** 按真实 Mapper 返回的主键顺序断言排序结果。 */
     private void assertOrder(String sortBy, String sortOrder, List<String> expected) {
-        assertEquals(expected, names(serverMapper.selectActiveServers(null, 0L, 20, sortBy, sortOrder)));
+        assertEquals(expected, names(serverMapper.selectActiveServers(TEST_PREFIX, 0L, 20, sortBy, sortOrder)));
     }
 
     /** 将 Mapper 实体结果转换为测试记录名称顺序，避免依赖自增 ID。 */

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/coder/websocket"
@@ -36,6 +37,8 @@ type Client struct {
 	heartbeatInterval time.Duration
 	reconnectInitial  time.Duration
 	reconnectMax      time.Duration
+	connectionMu      sync.RWMutex
+	connection        *websocket.Conn
 }
 
 // NewClient 创建 WebSocket 客户端。
@@ -86,7 +89,15 @@ func (c *Client) Run(ctx context.Context) error {
 		backoff = c.reconnectInitial
 		c.logger.Info("agent authenticated", "server_id", c.serverID)
 
+		c.connectionMu.Lock()
+		c.connection = conn
+		c.connectionMu.Unlock()
 		err = c.runLoops(ctx, conn)
+		c.connectionMu.Lock()
+		if c.connection == conn {
+			c.connection = nil
+		}
+		c.connectionMu.Unlock()
 		conn.CloseNow()
 
 		if err := ctx.Err(); err != nil {
@@ -221,10 +232,24 @@ func (c *Client) handleMessage(msg AgentMessage) {
 	}
 }
 
-// SendMetrics 通过已认证连接发送 metrics.report 消息。
+// SendMetrics 通过当前已认证连接发送 metrics.report 消息。
 //
-// 阶段 2 未实现；阶段 4 接入 collector 和 reporter 后实现，
-// 届时需要将 conn 存入 Client 并加写锁保证并发安全。
+// coder/websocket 会串行化并发写入；连接指针仅在鉴权成功期间可用，
+// 因此此处只需使用读锁保护其生命周期。
 func (c *Client) SendMetrics(payload MetricsPayload) error {
-	return fmt.Errorf("not implemented: metrics report (阶段 4)")
+	c.connectionMu.RLock()
+	conn := c.connection
+	c.connectionMu.RUnlock()
+	if conn == nil {
+		return fmt.Errorf("send metrics: agent is not authenticated")
+	}
+
+	msg := newMessage("metrics.report", payload)
+	writeCtx, cancel := context.WithTimeout(context.Background(), writeTimeout)
+	defer cancel()
+	if err := wsjson.Write(writeCtx, conn, msg); err != nil {
+		return fmt.Errorf("write metrics: %w", err)
+	}
+	c.logger.Debug("metrics sent", "message_id", msg.MessageID)
+	return nil
 }
