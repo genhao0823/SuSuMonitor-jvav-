@@ -120,7 +120,7 @@ After an alert is triggered and the alert evaluation transaction commits, subscr
 
 ## Terminal Messages
 
-Terminal messages use the common outer structure, require a UUID `message_id`, and use a UTC ISO-8601 `timestamp`. Java currently accepts and routes browser control frames to the matching authenticated Agent; Agent response routing is implemented separately.
+Terminal messages use the common outer structure, require a UUID `message_id`, and use a UTC ISO-8601 `timestamp`. Java routes browser control frames to the matching authenticated Agent and routes Agent responses only to the browser connection that created the session.
 
 All users whose latest database `review_status` is `approved` may request a root terminal regardless of role. This grants control equivalent to root access on the target family Linux host. Java must recheck the latest user state for every `terminal.open`, `terminal.input`, `terminal.resize`, and `terminal.close`; it must not rely only on the Monitor handshake snapshot.
 
@@ -147,6 +147,8 @@ terminal.error   payload: server_id, optional session_id, code, message (1-256 c
 ```
 
 The browser must never send `terminal.opened`, `terminal.output`, `terminal.closed`, or `terminal.error`. The Agent must never send `terminal.open`, `terminal.input`, `terminal.resize`, or `terminal.close`. Java generates `session_id`; the browser and Agent cannot choose it. Terminal input and output must not be persisted or logged.
+
+Before forwarding an Agent terminal response, Java validates its protocol payload, verifies payload `server_id` matches the authenticated Agent connection, and verifies that `session_id` is bound to that same server. `terminal.opened` transitions metadata to `open`; `terminal.closed` persists closure and removes the in-memory relay binding after delivery.
 
 Terminal-specific error codes are `40003` invalid payload, `40302` access denied, `40403` session not found, `40903` session state conflict, `40904` Agent offline, `42903` session limit reached, and `42904` terminal message limit reached.
 
