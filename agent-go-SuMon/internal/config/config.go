@@ -40,6 +40,10 @@ type Config struct {
 	TerminalMaxInputBytes int
 	// TerminalMaxOutputBytes 是单个 PTY 输出块的最大字节数。
 	TerminalMaxOutputBytes int
+	// TerminalOutputRateBytesPerSecond 是单个 PTY 会话每秒允许转发的原始输出字节数。
+	TerminalOutputRateBytesPerSecond int
+	// TerminalOutputBurstBytes 是单个 PTY 会话可立即转发的原始输出字节突发上限。
+	TerminalOutputBurstBytes int
 	// TerminalOutputQueueSize 是每个 PTY 会话的有界输出队列大小。
 	TerminalOutputQueueSize int
 	// TerminalIdleTimeoutSeconds 是无输入自动关闭阈值。
@@ -90,6 +94,12 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	if cfg.TerminalMaxOutputBytes, err = getenvIntDefault("SUSUMONITOR_TERMINAL_MAX_OUTPUT_BYTES", 16*1024); err != nil {
+		return nil, err
+	}
+	if cfg.TerminalOutputRateBytesPerSecond, err = getenvIntDefault("SUSUMONITOR_TERMINAL_OUTPUT_RATE_BYTES_PER_SECOND", 256*1024); err != nil {
+		return nil, err
+	}
+	if cfg.TerminalOutputBurstBytes, err = getenvIntDefault("SUSUMONITOR_TERMINAL_OUTPUT_BURST_BYTES", 512*1024); err != nil {
 		return nil, err
 	}
 	if cfg.TerminalOutputQueueSize, err = getenvIntDefault("SUSUMONITOR_TERMINAL_OUTPUT_QUEUE_SIZE", 64); err != nil {
@@ -146,6 +156,13 @@ func (c *Config) validate() error {
 	}
 	if c.TerminalMaxOutputBytes < 1 || c.TerminalMaxOutputBytes > 16*1024 {
 		return fmt.Errorf("terminal max output bytes must be between 1 and 16384")
+	}
+	if c.TerminalOutputRateBytesPerSecond < 1 {
+		return fmt.Errorf("terminal output rate bytes per second must be positive")
+	}
+	if c.TerminalOutputBurstBytes < c.TerminalMaxOutputBytes {
+		return fmt.Errorf("terminal output burst bytes (%d) must be >= max output bytes (%d)",
+			c.TerminalOutputBurstBytes, c.TerminalMaxOutputBytes)
 	}
 	if c.TerminalOutputQueueSize < 1 || c.TerminalOutputQueueSize > 64 {
 		return fmt.Errorf("terminal output queue size must be between 1 and 64")

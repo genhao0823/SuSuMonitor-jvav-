@@ -17,6 +17,8 @@ func setValidEnvironment(t *testing.T) {
 	t.Setenv("SUSUMONITOR_TERMINAL_MAX_SESSIONS", "4")
 	t.Setenv("SUSUMONITOR_TERMINAL_MAX_INPUT_BYTES", "16384")
 	t.Setenv("SUSUMONITOR_TERMINAL_MAX_OUTPUT_BYTES", "16384")
+	t.Setenv("SUSUMONITOR_TERMINAL_OUTPUT_RATE_BYTES_PER_SECOND", "262144")
+	t.Setenv("SUSUMONITOR_TERMINAL_OUTPUT_BURST_BYTES", "524288")
 	t.Setenv("SUSUMONITOR_TERMINAL_OUTPUT_QUEUE_SIZE", "64")
 	t.Setenv("SUSUMONITOR_TERMINAL_IDLE_TIMEOUT_SECONDS", "1200")
 	t.Setenv("SUSUMONITOR_TERMINAL_MAX_LIFETIME_SECONDS", "28800")
@@ -29,8 +31,22 @@ func TestLoadValidConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.ServerID != 42 || cfg.CollectIntervalSeconds != 7 || cfg.LogLevel != "debug" {
+	if cfg.ServerID != 42 || cfg.CollectIntervalSeconds != 7 || cfg.LogLevel != "debug" ||
+		cfg.TerminalOutputRateBytesPerSecond != 256*1024 || cfg.TerminalOutputBurstBytes != 512*1024 {
 		t.Fatalf("unexpected config: %+v", cfg)
+	}
+}
+
+func TestLoadUsesTerminalOutputRateDefaults(t *testing.T) {
+	setValidEnvironment(t)
+	t.Setenv("SUSUMONITOR_TERMINAL_OUTPUT_RATE_BYTES_PER_SECOND", "")
+	t.Setenv("SUSUMONITOR_TERMINAL_OUTPUT_BURST_BYTES", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.TerminalOutputRateBytesPerSecond != 256*1024 || cfg.TerminalOutputBurstBytes != 512*1024 {
+		t.Fatalf("unexpected terminal output defaults: %+v", cfg)
 	}
 }
 
@@ -56,6 +72,8 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		{"zero reconnect initial", "SUSUMONITOR_RECONNECT_INITIAL_SECONDS", "0"},
 		{"terminal sessions too large", "SUSUMONITOR_TERMINAL_MAX_SESSIONS", "5"},
 		{"terminal input too large", "SUSUMONITOR_TERMINAL_MAX_INPUT_BYTES", "16385"},
+		{"terminal output rate zero", "SUSUMONITOR_TERMINAL_OUTPUT_RATE_BYTES_PER_SECOND", "0"},
+		{"terminal output burst below output block", "SUSUMONITOR_TERMINAL_OUTPUT_BURST_BYTES", "16383"},
 		{"terminal relative shell", "SUSUMONITOR_TERMINAL_SHELL", "bash"},
 	}
 	for _, tt := range tests {

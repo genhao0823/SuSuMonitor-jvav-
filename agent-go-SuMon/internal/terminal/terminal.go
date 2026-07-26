@@ -18,14 +18,16 @@ var (
 
 // Config 固定 Agent 本地终端执行边界，远端协议不能覆盖这些字段。
 type Config struct {
-	Enabled         bool
-	Shell           string
-	MaxSessions     int
-	MaxInputBytes   int
-	MaxOutputBytes  int
-	OutputQueueSize int
-	IdleTimeout     time.Duration
-	MaxLifetime     time.Duration
+	Enabled                  bool
+	Shell                    string
+	MaxSessions              int
+	MaxInputBytes            int
+	MaxOutputBytes           int
+	OutputRateBytesPerSecond int
+	OutputBurstBytes         int
+	OutputQueueSize          int
+	IdleTimeout              time.Duration
+	MaxLifetime              time.Duration
 }
 
 // Callbacks 将 PTY 状态和输出交给上层协议适配器。

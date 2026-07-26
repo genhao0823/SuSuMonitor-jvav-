@@ -33,6 +33,41 @@ type session struct {
 	mu          sync.Mutex
 	lastInputAt time.Time
 	openedAt    time.Time
+	outputLimit *outputLimiter
+}
+
+type outputLimiter struct {
+	mu        sync.Mutex
+	rate      float64
+	burst     float64
+	tokens    float64
+	updatedAt time.Time
+	now       func() time.Time
+}
+
+// newOutputLimiter 创建使用系统时钟的会话输出令牌桶。
+func newOutputLimiter(rate int, burst int) *outputLimiter {
+	return newOutputLimiterAt(rate, burst, time.Now)
+}
+
+// newOutputLimiterAt 创建使用指定时钟的输出令牌桶，供确定性测试验证令牌补充。
+func newOutputLimiterAt(rate int, burst int, now func() time.Time) *outputLimiter {
+	createdAt := now()
+	return &outputLimiter{rate: float64(rate), burst: float64(burst), tokens: float64(burst), updatedAt: createdAt, now: now}
+}
+
+// allow 消耗本会话的原始输出字节令牌；不足时拒绝该输出块而不等待。
+func (l *outputLimiter) allow(bytes int) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := l.now()
+	l.tokens = min(l.burst, l.tokens+now.Sub(l.updatedAt).Seconds()*l.rate)
+	l.updatedAt = now
+	if float64(bytes) > l.tokens {
+		return false
+	}
+	l.tokens -= float64(bytes)
+	return true
 }
 
 // NewManager 创建 Linux PTY 管理器。
@@ -41,6 +76,7 @@ func NewManager(config Config, callbacks Callbacks) (Manager, error) {
 		return &manager{config: config, callbacks: callbacks, sessions: make(map[string]*session)}, nil
 	}
 	if config.Shell == "" || config.MaxSessions < 1 || config.MaxInputBytes < 1 || config.MaxOutputBytes < 1 ||
+		config.OutputRateBytesPerSecond < 1 || config.OutputBurstBytes < config.MaxOutputBytes ||
 		config.OutputQueueSize < 1 || config.IdleTimeout <= 0 || config.MaxLifetime <= 0 {
 		return nil, fmt.Errorf("invalid terminal configuration")
 	}
@@ -74,7 +110,8 @@ func (m *manager) Open(ctx context.Context, sessionID string, cols uint16, rows 
 		return fmt.Errorf("start pty: %w", err)
 	}
 	s := &session{id: sessionID, command: command, pty: ptmx, outputQueue: make(chan []byte, m.config.OutputQueueSize),
-		done: make(chan struct{}), waitDone: make(chan struct{}), lastInputAt: time.Now(), openedAt: time.Now()}
+		done: make(chan struct{}), waitDone: make(chan struct{}), lastInputAt: time.Now(), openedAt: time.Now(),
+		outputLimit: newOutputLimiter(m.config.OutputRateBytesPerSecond, m.config.OutputBurstBytes)}
 	m.sessions[sessionID] = s
 	m.mu.Unlock()
 	go m.readOutput(s)
@@ -174,6 +211,10 @@ func (m *manager) forwardOutput(s *session) {
 	for {
 		select {
 		case data := <-s.outputQueue:
+			if !s.outputLimit.allow(len(data)) {
+				m.closeSession(s, "output_rate_exceeded", nil)
+				return
+			}
 			if m.callbacks.Output != nil {
 				m.callbacks.Output(s.id, data)
 			}
@@ -221,7 +262,7 @@ func (m *manager) waitProcess(s *session) {
 func (m *manager) closeSession(s *session, reason string, exitCode *int) {
 	s.closeOnce.Do(func() {
 		close(s.done)
-		if s.command.Process != nil {
+		if s.command != nil && s.command.Process != nil {
 			_ = syscall.Kill(-s.command.Process.Pid, syscall.SIGTERM)
 			go func(processID int) {
 				select {
@@ -231,7 +272,9 @@ func (m *manager) closeSession(s *session, reason string, exitCode *int) {
 				}
 			}(s.command.Process.Pid)
 		}
-		_ = s.pty.Close()
+		if s.pty != nil {
+			_ = s.pty.Close()
+		}
 		m.mu.Lock()
 		delete(m.sessions, s.id)
 		m.mu.Unlock()

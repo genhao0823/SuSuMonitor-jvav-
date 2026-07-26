@@ -148,7 +148,7 @@ terminal.closed  payload: server_id, session_id, reason (1-128 chars)
 terminal.error   payload: server_id, optional session_id, code, message (1-256 chars)
 ```
 
-The browser must never send `terminal.opened`, `terminal.output`, `terminal.closed`, or `terminal.error`. The Agent must never send `terminal.open`, `terminal.input`, `terminal.resize`, or `terminal.close`. Java generates `session_id`; the browser and Agent cannot choose it. Terminal input and output must not be persisted or logged.
+The browser must never send `terminal.opened`, `terminal.output`, `terminal.closed`, or `terminal.error`. The Agent must never send `terminal.open`, `terminal.input`, `terminal.resize`, or `terminal.close`. Java generates `session_id`; the browser and Agent cannot choose it. Terminal input and output must not be persisted or logged. The Agent applies an independent per-PTY-session raw-byte Token Bucket before emitting `terminal.output`: `SUSUMONITOR_TERMINAL_OUTPUT_RATE_BYTES_PER_SECOND` defaults to 262144 (256 KiB/s) and `SUSUMONITOR_TERMINAL_OUTPUT_BURST_BYTES` defaults to 524288 (512 KiB). The bucket starts full, never waits for output, and closes the session with `terminal.closed.reason=output_rate_exceeded` before forwarding an over-limit block. Both values must be positive, and the burst must be at least `SUSUMONITOR_TERMINAL_MAX_OUTPUT_BYTES`.
 
 Before forwarding an Agent terminal response, Java validates its protocol payload, verifies payload `server_id` matches the authenticated Agent connection, and verifies that `session_id` is bound to that same server. `terminal.opened` transitions metadata to `open`; `terminal.closed` persists closure and removes the in-memory relay binding after delivery.
 

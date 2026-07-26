@@ -29,6 +29,7 @@ func newTerminalAgent(cfg *config.Config, client *wsclient.Client, logger *slog.
 	manager, err := terminal.NewManager(terminal.Config{
 		Enabled: cfg.TerminalEnabled, Shell: cfg.TerminalShell, MaxSessions: cfg.TerminalMaxSessions,
 		MaxInputBytes: cfg.TerminalMaxInputBytes, MaxOutputBytes: cfg.TerminalMaxOutputBytes,
+		OutputRateBytesPerSecond: cfg.TerminalOutputRateBytesPerSecond, OutputBurstBytes: cfg.TerminalOutputBurstBytes,
 		OutputQueueSize: cfg.TerminalOutputQueueSize,
 		IdleTimeout:     time.Duration(cfg.TerminalIdleTimeoutSeconds) * time.Second,
 		MaxLifetime:     time.Duration(cfg.TerminalMaxLifetimeSeconds) * time.Second,
