@@ -49,7 +49,7 @@ class MetricsServiceTests {
     /** 创建每个用例独立的 Service，并默认模拟已锁定的有效服务器行。 */
     @BeforeEach
     void setUp() {
-        service = new MetricsService(metricsMapper, serverMapper, eventPublisher);
+        service = new MetricsServiceImpl(metricsMapper, serverMapper, eventPublisher);
     }
 
     /** 首次投递写入去重记录和指标，并发布一次 Metrics 事件。 */

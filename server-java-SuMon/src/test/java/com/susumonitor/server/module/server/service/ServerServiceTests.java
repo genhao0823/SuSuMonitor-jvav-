@@ -64,7 +64,7 @@ class ServerServiceTests {
     /** 在每个测试前创建待测服务器服务。 */
     @BeforeEach
     void setUp() {
-        serverService = new ServerService(serverMapper, credentialCipher);
+        serverService = new ServerServiceImpl(serverMapper, credentialCipher);
     }
 
     /** 验证密码认证创建先取得 ID，再使用 ID 加密并更新密码密文。 */

@@ -33,7 +33,7 @@ class JwtTokenServiceTests {
         signingKey = Keys.hmacShaKeyFor("0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.UTF_8));
         AppProperties appProperties = new AppProperties();
         appProperties.getJwt().setExpireHours(72);
-        jwtTokenService = new JwtTokenService(signingKey, appProperties);
+        jwtTokenService = new JwtTokenServiceImpl(signingKey, appProperties);
     }
 
     /**
@@ -173,7 +173,7 @@ class JwtTokenServiceTests {
     private JwtTokenService serviceWithKey(SecretKey key) {
         AppProperties appProperties = new AppProperties();
         appProperties.getJwt().setExpireHours(24);
-        return new JwtTokenService(key, appProperties);
+        return new JwtTokenServiceImpl(key, appProperties);
     }
 
     /**

@@ -35,7 +35,7 @@ class AgentTokenServiceTests {
     /** 初始化 Token Service。 */
     @BeforeEach
     void setUp() {
-        service = new AgentTokenService(serverMapper);
+        service = new AgentTokenServiceImpl(serverMapper);
     }
 
     /** 验证首次注册返回一次性 Token，并向 Mapper 传入哈希而非同值明文。 */

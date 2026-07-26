@@ -39,12 +39,12 @@ class AlertRuleServiceTests {
     @Mock
     private AlertRuleMapper ruleMapper;
     @InjectMocks
-    private AlertRuleService service;
+    private AlertRuleServiceImpl service;
 
     /** admin 创建合法规则应成功。 */
     @Test
     void createRuleShouldSucceed() {
-        service = new AlertRuleService(ruleMapper, CLOCK);
+        service = new AlertRuleServiceImpl(ruleMapper, CLOCK);
         CreateAlertRuleRequest request = new CreateAlertRuleRequest();
         request.setServerId(1L);
         request.setMetric("cpu");
@@ -66,7 +66,7 @@ class AlertRuleServiceTests {
     /** 非法 metric 应返回 40002。 */
     @Test
     void invalidMetricShouldReturnInvalidParameter() {
-        service = new AlertRuleService(ruleMapper, CLOCK);
+        service = new AlertRuleServiceImpl(ruleMapper, CLOCK);
         CreateAlertRuleRequest request = new CreateAlertRuleRequest();
         request.setMetric("network");
         request.setOperator(">");
@@ -81,7 +81,7 @@ class AlertRuleServiceTests {
     /** 非法 operator 应返回 40002。 */
     @Test
     void invalidOperatorShouldReturnInvalidParameter() {
-        service = new AlertRuleService(ruleMapper, CLOCK);
+        service = new AlertRuleServiceImpl(ruleMapper, CLOCK);
         CreateAlertRuleRequest request = new CreateAlertRuleRequest();
         request.setMetric("cpu");
         request.setOperator("==");
@@ -96,7 +96,7 @@ class AlertRuleServiceTests {
     /** 更新不存在的规则应返回 40400。 */
     @Test
     void updateNonexistentRuleShouldReturnNotFound() {
-        service = new AlertRuleService(ruleMapper, CLOCK);
+        service = new AlertRuleServiceImpl(ruleMapper, CLOCK);
         when(ruleMapper.selectActiveRuleById(999L)).thenReturn(null);
 
         UpdateAlertRuleRequest request = new UpdateAlertRuleRequest();
@@ -112,7 +112,7 @@ class AlertRuleServiceTests {
     /** 软删除不存在的规则应返回 40400。 */
     @Test
     void deleteNonexistentRuleShouldReturnNotFound() {
-        service = new AlertRuleService(ruleMapper, CLOCK);
+        service = new AlertRuleServiceImpl(ruleMapper, CLOCK);
         when(ruleMapper.selectActiveRuleById(999L)).thenReturn(null);
 
         BusinessException exception = assertThrows(BusinessException.class,
@@ -123,7 +123,7 @@ class AlertRuleServiceTests {
     /** 软删除已存在的规则应调用 softDeleteRule。 */
     @Test
     void deleteRuleShouldSoftDelete() {
-        service = new AlertRuleService(ruleMapper, CLOCK);
+        service = new AlertRuleServiceImpl(ruleMapper, CLOCK);
         when(ruleMapper.selectActiveRuleById(1L)).thenReturn(ruleEntity(1L, "cpu", ">", "80", "warning"));
 
         service.deleteRule(1L);
@@ -134,7 +134,7 @@ class AlertRuleServiceTests {
     /** 列表查询应返回所有未删除规则。 */
     @Test
     void listRulesShouldReturnAllActiveRules() {
-        service = new AlertRuleService(ruleMapper, CLOCK);
+        service = new AlertRuleServiceImpl(ruleMapper, CLOCK);
         when(ruleMapper.selectActiveRules()).thenReturn(List.of(
                 ruleEntity(1L, "cpu", ">", "80", "warning"),
                 ruleEntity(2L, "memory", ">=", "90", "critical")));

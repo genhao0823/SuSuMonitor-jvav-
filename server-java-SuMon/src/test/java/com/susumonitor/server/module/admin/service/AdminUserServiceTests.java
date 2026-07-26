@@ -36,7 +36,7 @@ class AdminUserServiceTests {
     // 在每个测试前创建管理员服务。
     @BeforeEach
     void setUp() {
-        adminUserService = new AdminUserService(userMapper);
+        adminUserService = new AdminUserServiceImpl(userMapper);
     }
 
     // 验证待审核列表返回安全 VO。

@@ -93,6 +93,6 @@ class MetricsCleanupServiceTests {
             TransactionCallback<Integer> callback = invocation.getArgument(0);
             return callback.doInTransaction(null);
         }).when(transactionTemplate).execute(any());
-        return new MetricsCleanupService(metricsCleanupMapper, appProperties, transactionTemplate);
+        return new MetricsCleanupServiceImpl(metricsCleanupMapper, appProperties, transactionTemplate);
     }
 }

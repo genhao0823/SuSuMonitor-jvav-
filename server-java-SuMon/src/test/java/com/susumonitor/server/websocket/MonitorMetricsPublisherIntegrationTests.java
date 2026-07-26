@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susumonitor.server.module.metrics.dto.MetricsReportPayload;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
 import com.susumonitor.server.module.metrics.service.MetricsService;
+import com.susumonitor.server.module.metrics.service.MetricsServiceImpl;
 import com.susumonitor.server.module.server.entity.ServerEntity;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import java.math.BigDecimal;
@@ -161,7 +162,7 @@ class MonitorMetricsPublisherIntegrationTests {
         @Bean
         MetricsService metricsService(MetricsMapper metricsMapper, ServerMapper serverMapper,
                 ApplicationEventPublisher eventPublisher) {
-            return new MetricsService(metricsMapper, serverMapper, eventPublisher);
+            return new MetricsServiceImpl(metricsMapper, serverMapper, eventPublisher);
         }
     }
 }

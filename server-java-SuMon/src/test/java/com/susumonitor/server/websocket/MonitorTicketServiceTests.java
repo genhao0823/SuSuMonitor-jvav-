@@ -29,7 +29,7 @@ class MonitorTicketServiceTests {
     @Test
     void ticketShouldBeSingleUse() {
         MutableClock clock = new MutableClock(Instant.parse("2026-07-22T00:00:00Z"));
-        MonitorTicketService service = new MonitorTicketService(Duration.ofSeconds(30), clock);
+        MonitorTicketService service = new MonitorTicketServiceImpl(Duration.ofSeconds(30), clock);
         AuthenticatedUser user = new AuthenticatedUser(1L, "admin", "admin", "approved", null,
                 OffsetDateTime.now());
 
@@ -46,7 +46,7 @@ class MonitorTicketServiceTests {
     void ticketShouldExpireAtThirtySecondBoundary() {
         Instant issuedAt = Instant.parse("2026-07-22T00:00:00Z");
         MutableClock clock = new MutableClock(issuedAt);
-        MonitorTicketService service = new MonitorTicketService(Duration.ofSeconds(30), clock);
+        MonitorTicketService service = new MonitorTicketServiceImpl(Duration.ofSeconds(30), clock);
         AuthenticatedUser user = new AuthenticatedUser(1L, "admin", "admin", "approved", null,
                 OffsetDateTime.ofInstant(issuedAt, ZoneOffset.UTC));
 
@@ -67,7 +67,7 @@ class MonitorTicketServiceTests {
     void purgeShouldRemoveExpiredUnconsumedTicket() throws Exception {
         Instant issuedAt = Instant.parse("2026-07-22T00:00:00Z");
         MutableClock clock = new MutableClock(issuedAt);
-        MonitorTicketService service = new MonitorTicketService(Duration.ofSeconds(30), clock);
+        MonitorTicketService service = new MonitorTicketServiceImpl(Duration.ofSeconds(30), clock);
         AuthenticatedUser user = new AuthenticatedUser(1L, "admin", "admin", "approved", null,
                 OffsetDateTime.ofInstant(issuedAt, ZoneOffset.UTC));
         service.issue(user);
@@ -83,7 +83,7 @@ class MonitorTicketServiceTests {
     void concurrentConsumeShouldSucceedOnlyOnce() throws Exception {
         Instant issuedAt = Instant.parse("2026-07-22T00:00:00Z");
         MutableClock clock = new MutableClock(issuedAt);
-        MonitorTicketService service = new MonitorTicketService(Duration.ofSeconds(30), clock);
+        MonitorTicketService service = new MonitorTicketServiceImpl(Duration.ofSeconds(30), clock);
         AuthenticatedUser user = new AuthenticatedUser(1L, "admin", "admin", "approved", null,
                 OffsetDateTime.ofInstant(issuedAt, ZoneOffset.UTC));
         MonitorTicketVo ticket = service.issue(user);
@@ -118,7 +118,7 @@ class MonitorTicketServiceTests {
 
     /** 读取测试对象中的待消费 Ticket 数量，用于直接验证清理效果。 */
     private int ticketCount(MonitorTicketService service) throws Exception {
-        Field field = MonitorTicketService.class.getDeclaredField("tickets");
+        Field field = MonitorTicketServiceImpl.class.getDeclaredField("tickets");
         field.setAccessible(true);
         return ((ConcurrentMap<?, ?>) field.get(service)).size();
     }

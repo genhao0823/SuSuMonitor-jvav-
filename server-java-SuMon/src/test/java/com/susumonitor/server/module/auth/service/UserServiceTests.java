@@ -56,7 +56,7 @@ class UserServiceTests {
     @BeforeEach
     void setUp() {
         when(passwordEncoder.encode("SUSUMONITOR_DUMMY_LOGIN_PASSWORD")).thenReturn("dummy-bcrypt-hash");
-        userService = new UserService(userMapper, authBootstrapStateMapper, passwordEncoder, jwtTokenService);
+        userService = new UserServiceImpl(userMapper, authBootstrapStateMapper, passwordEncoder, jwtTokenService);
     }
 
     // 验证第一个用户注册后成为已审核的管理员。

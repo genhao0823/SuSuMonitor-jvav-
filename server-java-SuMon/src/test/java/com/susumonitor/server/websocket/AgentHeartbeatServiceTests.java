@@ -34,7 +34,7 @@ class AgentHeartbeatServiceTests {
         AgentWebSocketSession session = new AgentWebSocketSession(socket, clock);
         session.authenticate(SERVER_ID, LocalDateTime.ofInstant(HEARTBEAT_AT, ZoneOffset.UTC));
         when(registry.sessions()).thenReturn(List.of(session));
-        AgentHeartbeatService service = new AgentHeartbeatService(serverMapper, registry, clock);
+        AgentHeartbeatService service = new AgentHeartbeatServiceImpl(serverMapper, registry, clock);
 
         service.markExpiredSessionsOffline();
         verify(serverMapper, never()).markAgentOffline(SERVER_ID, session.lastHeartbeatAt());

@@ -190,7 +190,7 @@ class AlertEvaluationServiceTests {
     // --- 辅助方法 ---
 
     private void setupService() {
-        service = new AlertEvaluationService(ruleMapper, stateMapper, recordMapper,
+        service = new AlertEvaluationServiceImpl(ruleMapper, stateMapper, recordMapper,
                 stateMachine, eventPublisher, CLOCK);
     }
 

@@ -63,7 +63,7 @@ class ServerSshServiceTests {
     // 将当前方法注册为 JUnit 5 的测试初始化方法。
     @BeforeEach
     void setUp() {
-        serverSshService = new ServerSshService(serverMapper, credentialCipher, connectionTester);
+        serverSshService = new ServerSshServiceImpl(serverMapper, credentialCipher, connectionTester);
     }
 
     /** 验证未登记公钥时完成握手、CAS 首次确认并回读最终状态。 */
