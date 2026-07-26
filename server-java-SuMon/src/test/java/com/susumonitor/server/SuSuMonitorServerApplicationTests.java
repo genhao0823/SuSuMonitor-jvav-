@@ -8,6 +8,7 @@ import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
+import com.susumonitor.server.module.terminal.mapper.TerminalSessionMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -55,6 +56,10 @@ class SuSuMonitorServerApplicationTests {
 
     @MockitoBean
     private AlertStateMapper alertStateMapper;
+
+    // 使用模拟终端 Mapper，避免 V12 Mapper 扫描后创建真实 MyBatis 会话依赖。
+    @MockitoBean
+    private TerminalSessionMapper terminalSessionMapper;
 
     @MockitoBean
     private PlatformTransactionManager transactionManager;

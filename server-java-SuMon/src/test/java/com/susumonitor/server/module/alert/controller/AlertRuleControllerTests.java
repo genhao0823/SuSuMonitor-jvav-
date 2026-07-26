@@ -30,6 +30,7 @@ import com.susumonitor.server.module.server.mapper.ServerMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
+import com.susumonitor.server.module.terminal.mapper.TerminalSessionMapper;
 import com.susumonitor.server.security.JwtTokenService;
 import com.susumonitor.server.security.SecurityConfig;
 import com.susumonitor.server.security.SecurityErrorHandler;
@@ -79,6 +80,8 @@ class AlertRuleControllerTests {
     private AlertRecordMapper alertRecordMapper;
     @MockitoBean
     private AlertStateMapper alertStateMapper;
+    @MockitoBean
+    private TerminalSessionMapper terminalSessionMapper;
 
     /** admin 创建合法规则应返回 200。 */
     @Test

@@ -22,6 +22,7 @@ import com.susumonitor.server.security.JwtTokenService;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
+import com.susumonitor.server.module.terminal.mapper.TerminalSessionMapper;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -88,6 +89,10 @@ class AdminUserControllerTests {
 
     @MockitoBean
     private AlertStateMapper alertStateMapper;
+
+    // 使用模拟终端 Mapper，避免 V12 Mapper 扫描后创建真实 MyBatis 会话依赖。
+    @MockitoBean
+    private TerminalSessionMapper terminalSessionMapper;
 
     @MockitoBean
     private PlatformTransactionManager transactionManager;

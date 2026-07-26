@@ -31,6 +31,7 @@ import com.susumonitor.server.security.SecurityErrorHandler;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
+import com.susumonitor.server.module.terminal.mapper.TerminalSessionMapper;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -98,6 +99,10 @@ class AgentTokenControllerTests {
 
     @MockitoBean
     private AlertStateMapper alertStateMapper;
+
+    // 使用模拟终端 Mapper，避免 V12 Mapper 扫描后创建真实 MyBatis 会话依赖。
+    @MockitoBean
+    private TerminalSessionMapper terminalSessionMapper;
 
     /** 验证管理员可注册和轮换 Token，明文仅出现在这两个一次性响应中。 */
     @Test
