@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.susumonitor.server.config.AppProperties;
 import com.susumonitor.server.module.server.entity.ServerEntity;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import com.susumonitor.server.security.AuthenticatedUser;
@@ -91,6 +92,25 @@ class MonitorWebSocketHandlerTests {
         verify(ctx.socket, never()).sendMessage(any(TextMessage.class));
     }
 
+    /** 验证超过 terminal.open 突发额度时回送稳定的 42904 错误帧且不调用中继。 */
+    @Test
+    void terminalMessageLimitShouldReturnErrorFrameWithoutRelaying() throws Exception {
+        AppProperties properties = new AppProperties();
+        properties.getTerminal().setOpenBurst(1);
+        TerminalMessageRateLimiter limiter = new TerminalMessageRateLimiter(properties, Clock.systemUTC());
+        TerminalMonitorRelayService relayService = mock(TerminalMonitorRelayService.class);
+        TestContext ctx = new TestContext(relayService, limiter);
+        String payload = "{\"type\":\"terminal.open\",\"message_id\":\""
+                + java.util.UUID.randomUUID() + "\",\"timestamp\":\"2026-07-26T00:00:00Z\",\"payload\":{\"server_id\":1,\"cols\":80,\"rows\":24}}";
+
+        ctx.sendText(payload);
+        ctx.sendText(payload.replaceFirst("terminal.open", "terminal.open"));
+
+        JsonNode error = ctx.captureErrorFrame();
+        assertEquals(42904, error.get("payload").get("code").asInt());
+        verify(relayService).relay(any(MonitorWebSocketSession.class), any(TerminalMessage.class));
+    }
+
     /** 封装 MonitorWebSocketHandler 的测试上下文。 */
     private static final class TestContext {
         final WebSocketSession socket;
@@ -99,6 +119,10 @@ class MonitorWebSocketHandlerTests {
         private TextMessage lastMessage;
 
         TestContext() {
+            this(null, null);
+        }
+
+        TestContext(TerminalMonitorRelayService terminalRelayService, TerminalMessageRateLimiter terminalMessageRateLimiter) {
             this.socket = mock(WebSocketSession.class);
             when(socket.getId()).thenReturn("monitor-test");
             when(socket.isOpen()).thenReturn(true);
@@ -111,7 +135,10 @@ class MonitorWebSocketHandlerTests {
 
             MonitorSubscriptionRegistry registry = new MonitorSubscriptionRegistry();
             Clock clock = Clock.fixed(CONNECTED_AT, ZoneOffset.UTC);
-            this.handler = new MonitorWebSocketHandler(new ObjectMapper(), serverMapper, registry, clock);
+            this.handler = terminalRelayService == null
+                    ? new MonitorWebSocketHandler(new ObjectMapper(), serverMapper, registry, clock)
+                    : new MonitorWebSocketHandler(new ObjectMapper(), serverMapper, registry, clock,
+                            terminalRelayService, null, terminalMessageRateLimiter);
 
             // 捕获 sendMessage 的参数供测试验证。
             try {

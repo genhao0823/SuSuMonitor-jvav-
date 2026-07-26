@@ -117,6 +117,15 @@ class AppPropertiesTests {
         assertFalse(validator.validate(properties).isEmpty());
     }
 
+    /** 验证终端控制帧每分钟限流配置不允许为零。 */
+    @Test
+    void nonPositiveTerminalInputRateShouldFailValidation() {
+        AppProperties properties = properties(VALID_TEST_SECRET, 24);
+        properties.getTerminal().setInputRatePerMinute(0);
+
+        assertFalse(validator.validate(properties).isEmpty());
+    }
+
     /**
      * 创建测试所需的应用配置。
      *

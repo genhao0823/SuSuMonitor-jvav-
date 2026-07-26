@@ -415,6 +415,30 @@ public class AppProperties {
         @Min(value = 1, message = "Terminal maximum session duration must be at least one hour")
         @Max(value = 168, message = "Terminal maximum session duration must not exceed one week")
         private int maxSessionHours = 8;
+        @Min(value = 1, message = "Terminal open rate must be at least one per minute")
+        @Max(value = 10000, message = "Terminal open rate must not exceed 10000 per minute")
+        private int openRatePerMinute = 6;
+        @Min(value = 1, message = "Terminal open burst must be at least one")
+        @Max(value = 10000, message = "Terminal open burst must not exceed 10000")
+        private int openBurst = 2;
+        @Min(value = 1, message = "Terminal input rate must be at least one per minute")
+        @Max(value = 100000, message = "Terminal input rate must not exceed 100000 per minute")
+        private int inputRatePerMinute = 600;
+        @Min(value = 1, message = "Terminal input burst must be at least one")
+        @Max(value = 100000, message = "Terminal input burst must not exceed 100000")
+        private int inputBurst = 120;
+        @Min(value = 1, message = "Terminal resize rate must be at least one per minute")
+        @Max(value = 10000, message = "Terminal resize rate must not exceed 10000 per minute")
+        private int resizeRatePerMinute = 60;
+        @Min(value = 1, message = "Terminal resize burst must be at least one")
+        @Max(value = 10000, message = "Terminal resize burst must not exceed 10000")
+        private int resizeBurst = 20;
+        @Min(value = 1, message = "Terminal close rate must be at least one per minute")
+        @Max(value = 10000, message = "Terminal close rate must not exceed 10000 per minute")
+        private int closeRatePerMinute = 30;
+        @Min(value = 1, message = "Terminal close burst must be at least one")
+        @Max(value = 10000, message = "Terminal close burst must not exceed 10000")
+        private int closeBurst = 10;
 
         public int getMaxSessionsPerUser() { return maxSessionsPerUser; }
         public void setMaxSessionsPerUser(int value) { maxSessionsPerUser = value; }
@@ -426,6 +450,22 @@ public class AppProperties {
         public void setIdleTimeoutMinutes(int value) { idleTimeoutMinutes = value; }
         public int getMaxSessionHours() { return maxSessionHours; }
         public void setMaxSessionHours(int value) { maxSessionHours = value; }
+        public int getOpenRatePerMinute() { return openRatePerMinute; }
+        public void setOpenRatePerMinute(int value) { openRatePerMinute = value; }
+        public int getOpenBurst() { return openBurst; }
+        public void setOpenBurst(int value) { openBurst = value; }
+        public int getInputRatePerMinute() { return inputRatePerMinute; }
+        public void setInputRatePerMinute(int value) { inputRatePerMinute = value; }
+        public int getInputBurst() { return inputBurst; }
+        public void setInputBurst(int value) { inputBurst = value; }
+        public int getResizeRatePerMinute() { return resizeRatePerMinute; }
+        public void setResizeRatePerMinute(int value) { resizeRatePerMinute = value; }
+        public int getResizeBurst() { return resizeBurst; }
+        public void setResizeBurst(int value) { resizeBurst = value; }
+        public int getCloseRatePerMinute() { return closeRatePerMinute; }
+        public void setCloseRatePerMinute(int value) { closeRatePerMinute = value; }
+        public int getCloseBurst() { return closeBurst; }
+        public void setCloseBurst(int value) { closeBurst = value; }
     }
 
     /**

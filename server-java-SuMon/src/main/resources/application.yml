@@ -68,6 +68,14 @@ susumonitor:
     max-sessions: ${TERMINAL_MAX_SESSIONS:16}
     idle-timeout-minutes: ${TERMINAL_IDLE_TIMEOUT_MINUTES:20}
     max-session-hours: ${TERMINAL_MAX_SESSION_HOURS:8}
+    open-rate-per-minute: ${TERMINAL_OPEN_RATE_PER_MINUTE:6}
+    open-burst: ${TERMINAL_OPEN_BURST:2}
+    input-rate-per-minute: ${TERMINAL_INPUT_RATE_PER_MINUTE:600}
+    input-burst: ${TERMINAL_INPUT_BURST:120}
+    resize-rate-per-minute: ${TERMINAL_RESIZE_RATE_PER_MINUTE:60}
+    resize-burst: ${TERMINAL_RESIZE_BURST:20}
+    close-rate-per-minute: ${TERMINAL_CLOSE_RATE_PER_MINUTE:30}
+    close-burst: ${TERMINAL_CLOSE_BURST:10}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
     allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}

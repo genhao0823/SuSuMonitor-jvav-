@@ -137,6 +137,8 @@ Java to `/ws/agent` uses the same four types and additionally includes `server_i
 
 For every browser control frame, Java rechecks the user's current `approved` status and the session ownership in persistent metadata. It then resolves the `session_id` through the single-JVM relay registry and serializes writes to the target Agent connection. Browser-supplied `server_id` and `session_id` are never trusted for existing sessions; Java injects the persisted values before forwarding.
 
+Java applies independent in-memory Token Buckets before forwarding browser control frames. `terminal.open` is scoped to the originating Monitor WebSocket because no server session exists yet. `terminal.input`, `terminal.resize`, and `terminal.close` are scoped to the originating Monitor WebSocket plus the validated `session_id`, so a busy terminal cannot consume another terminal's control-frame allowance. The default limits are: open 6/minute with burst 2, input 600/minute with burst 120, resize 60/minute with burst 20, and close 30/minute with burst 10. Limits are configured only through `TERMINAL_OPEN_*`, `TERMINAL_INPUT_*`, `TERMINAL_RESIZE_*`, and `TERMINAL_CLOSE_*` environment variables. Java releases all buckets when the Monitor WebSocket closes. An over-limit frame is not relayed and receives `error.payload.code=42904`.
+
 Agent to `/ws/agent`:
 
 ```text
