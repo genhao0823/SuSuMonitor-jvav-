@@ -18,12 +18,15 @@ public class MonitorMetricsPublisher {
     private final ObjectMapper objectMapper;
     private final MonitorSubscriptionRegistry registry;
     private final Clock clock;
+    private final MonitorSessionTerminationService terminationService;
 
     /** 注入 JSON 序列化器和订阅注册表。 */
-    public MonitorMetricsPublisher(ObjectMapper objectMapper, MonitorSubscriptionRegistry registry, Clock clock) {
+    public MonitorMetricsPublisher(ObjectMapper objectMapper, MonitorSubscriptionRegistry registry, Clock clock,
+            MonitorSessionTerminationService terminationService) {
         this.objectMapper = objectMapper;
         this.registry = registry;
         this.clock = clock;
+        this.terminationService = terminationService;
     }
 
     /** 仅在数据库事务成功提交后发送指标更新。 */
@@ -32,11 +35,13 @@ public class MonitorMetricsPublisher {
         MetricsLatestVo metrics = event.metrics();
         for (MonitorWebSocketSession subscriber : registry.subscribers(metrics.getServerId())) {
             try {
-                if (subscriber.socketSession().isOpen()) {
-                    subscriber.socketSession().sendMessage(new TextMessage(message(metrics)));
+                if (!subscriber.send(new TextMessage(message(metrics)))) {
+                    terminationService.terminateNormally(subscriber);
                 }
+            } catch (MonitorBackpressureException exception) {
+                terminationService.terminateForBackpressure(subscriber);
             } catch (IOException exception) {
-                registry.remove(subscriber);
+                terminationService.terminateNormally(subscriber);
             }
         }
     }

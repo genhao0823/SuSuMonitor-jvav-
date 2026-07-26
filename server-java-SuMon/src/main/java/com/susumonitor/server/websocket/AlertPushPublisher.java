@@ -29,6 +29,7 @@ public class AlertPushPublisher {
     private final ObjectMapper objectMapper;
     private final MonitorSubscriptionRegistry registry;
     private final Clock clock;
+    private final MonitorSessionTerminationService terminationService;
 
     /**
      * 消费 AlertTriggeredEvent，在告警事务提交后推送。
@@ -40,11 +41,13 @@ public class AlertPushPublisher {
     public void onAlertTriggered(AlertTriggeredEvent event) {
         for (MonitorWebSocketSession subscriber : registry.subscribers(event.serverId())) {
             try {
-                if (subscriber.socketSession().isOpen()) {
-                    subscriber.socketSession().sendMessage(new TextMessage(message(event)));
+                if (!subscriber.send(new TextMessage(message(event)))) {
+                    terminationService.terminateNormally(subscriber);
                 }
+            } catch (MonitorBackpressureException exception) {
+                terminationService.terminateForBackpressure(subscriber);
             } catch (IOException exception) {
-                registry.remove(subscriber);
+                terminationService.terminateNormally(subscriber);
             }
         }
     }

@@ -33,9 +33,14 @@ public class TerminalRelayLifecycleService {
 
     /** 浏览器断开后通知在线 Agent 关闭 PTY，并收口对应会话元数据。 */
     public void closeMonitorSessions(MonitorWebSocketSession monitorSession) {
+        closeMonitorSessions(monitorSession, "monitor_disconnected");
+    }
+
+    /** 浏览器因指定原因关闭后通知在线 Agent 关闭 PTY，并收口对应会话元数据。 */
+    public void closeMonitorSessions(MonitorWebSocketSession monitorSession, String reason) {
         for (TerminalRelayRegistry.TerminalRelayBinding binding : relayRegistry.removeByMonitorSession(monitorSession)) {
             sendClose(binding);
-            closeBinding(binding, TerminalSessionStatus.CLOSED.value(), "monitor_disconnected");
+            closeBinding(binding, TerminalSessionStatus.CLOSED.value(), reason);
         }
     }
 

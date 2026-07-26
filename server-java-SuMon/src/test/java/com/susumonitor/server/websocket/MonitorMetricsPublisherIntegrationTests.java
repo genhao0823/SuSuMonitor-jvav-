@@ -158,6 +158,12 @@ class MonitorMetricsPublisherIntegrationTests {
             return mock(MonitorSubscriptionRegistry.class);
         }
 
+        /** 提供发布器在失败时收口 Monitor 会话所需的协调服务替身。 */
+        @Bean
+        MonitorSessionTerminationService monitorSessionTerminationService() {
+            return mock(MonitorSessionTerminationService.class);
+        }
+
         /** 使用 Spring 事件发布器构造受事务代理管理的 MetricsService。 */
         @Bean
         MetricsService metricsService(MetricsMapper metricsMapper, ServerMapper serverMapper,

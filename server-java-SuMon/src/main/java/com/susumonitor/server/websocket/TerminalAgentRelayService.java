@@ -8,6 +8,7 @@ import com.susumonitor.server.module.terminal.service.TerminalSessionService;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 
@@ -20,16 +21,27 @@ public class TerminalAgentRelayService {
     private final TerminalRelayLifecycleService lifecycleService;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final MonitorSessionTerminationService terminationService;
 
+    /** 将完整的生产依赖注入终端 Agent 中继，测试使用下方的隔离构造器。 */
+    @Autowired
     public TerminalAgentRelayService(TerminalSessionService terminalSessionService, TerminalRelayRegistry relayRegistry,
             TerminalOutputRateLimiter outputRateLimiter, TerminalRelayLifecycleService lifecycleService,
-            ObjectMapper objectMapper, Clock clock) {
+            ObjectMapper objectMapper, Clock clock, MonitorSessionTerminationService terminationService) {
         this.terminalSessionService = terminalSessionService;
         this.relayRegistry = relayRegistry;
         this.outputRateLimiter = outputRateLimiter;
         this.lifecycleService = lifecycleService;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.terminationService = terminationService;
+    }
+
+    /** 保持既有隔离测试可只提供终端中继所需依赖。 */
+    TerminalAgentRelayService(TerminalSessionService terminalSessionService, TerminalRelayRegistry relayRegistry,
+            TerminalOutputRateLimiter outputRateLimiter, TerminalRelayLifecycleService lifecycleService,
+            ObjectMapper objectMapper, Clock clock) {
+        this(terminalSessionService, relayRegistry, outputRateLimiter, lifecycleService, objectMapper, clock, null);
     }
 
     /** 验证 Agent 归属并将合法终端响应路由给原浏览器。 */
@@ -63,8 +75,32 @@ public class TerminalAgentRelayService {
         String body = objectMapper.createObjectNode().put("type", message.type())
                 .put("message_id", message.messageId()).put("timestamp", OffsetDateTime.now(clock).toString())
                 .set("payload", message.payload()).toString();
-        if (!binding.monitorSession().send(new TextMessage(body))) {
-            throw new BusinessException(ErrorCode.TERMINAL_SESSION_STATE_CONFLICT);
+        try {
+            if (!binding.monitorSession().send(new TextMessage(body))) {
+                terminateNormally(binding.monitorSession());
+            }
+        } catch (MonitorBackpressureException exception) {
+            terminateForBackpressure(binding.monitorSession());
+        } catch (IOException exception) {
+            terminateNormally(binding.monitorSession());
+        }
+    }
+
+    /** 统一处理已关闭或普通 I/O 失败导致的浏览器会话收口。 */
+    private void terminateNormally(MonitorWebSocketSession monitorSession) {
+        if (terminationService != null) {
+            terminationService.terminateNormally(monitorSession);
+        } else {
+            lifecycleService.closeMonitorSessions(monitorSession);
+        }
+    }
+
+    /** 统一处理 Spring 检测到的浏览器慢消费者。 */
+    private void terminateForBackpressure(MonitorWebSocketSession monitorSession) {
+        if (terminationService != null) {
+            terminationService.terminateForBackpressure(monitorSession);
+        } else {
+            lifecycleService.closeMonitorSessions(monitorSession, "monitor_backpressure");
         }
     }
 }

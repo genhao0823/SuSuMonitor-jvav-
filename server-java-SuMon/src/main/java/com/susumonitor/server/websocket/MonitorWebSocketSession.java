@@ -3,6 +3,8 @@ package com.susumonitor.server.websocket;
 import com.susumonitor.server.security.AuthenticatedUser;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.springframework.web.socket.handler.SessionLimitExceededException;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.TextMessage;
 import java.io.IOException;
@@ -13,6 +15,7 @@ public final class MonitorWebSocketSession {
     private final WebSocketSession socketSession;
     private final AuthenticatedUser user;
     private final Set<Long> subscribedServerIds = ConcurrentHashMap.newKeySet();
+    private final AtomicBoolean terminationStarted = new AtomicBoolean();
 
     /** 创建已通过握手 ticket 验证的 Monitor 会话。 */
     public MonitorWebSocketSession(WebSocketSession socketSession, AuthenticatedUser user) {
@@ -32,12 +35,25 @@ public final class MonitorWebSocketSession {
         return subscribedServerIds;
     }
 
+    /**
+     * 标记当前连接已开始收口，确保并发的背压、I/O 失败和关闭回调只执行一次资源释放。
+     *
+     * @return 当前调用是否取得收口执行权
+     */
+    public boolean beginTermination() {
+        return terminationStarted.compareAndSet(false, true);
+    }
+
     /** 串行化向单个浏览器连接的写入，避免终端输出与指标推送帧交错。 */
     public synchronized boolean send(TextMessage message) throws IOException {
         if (!socketSession.isOpen()) {
             return false;
         }
-        socketSession.sendMessage(message);
+        try {
+            socketSession.sendMessage(message);
+        } catch (SessionLimitExceededException exception) {
+            throw new MonitorBackpressureException(exception);
+        }
         return true;
     }
 }

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susumonitor.server.common.ErrorCode;
 import com.susumonitor.server.common.BusinessException;
+import com.susumonitor.server.config.AppProperties;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import com.susumonitor.server.security.AuthenticatedUser;
 import java.io.IOException;
@@ -19,6 +20,7 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator;
 
 /**
  * 处理已通过一次性 ticket 握手的浏览器指标订阅。
@@ -37,6 +39,8 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
     private final TerminalMonitorRelayService terminalRelayService;
     private final TerminalRelayLifecycleService terminalRelayLifecycleService;
     private final TerminalMessageRateLimiter terminalMessageRateLimiter;
+    private final MonitorSessionTerminationService terminationService;
+    private final AppProperties appProperties;
     private final Map<String, MonitorWebSocketSession> sessions = new ConcurrentHashMap<>();
 
     /** 注入 JSON、服务器权限查询和订阅注册表。 */
@@ -44,7 +48,8 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
     public MonitorWebSocketHandler(ObjectMapper objectMapper, ServerMapper serverMapper,
             MonitorSubscriptionRegistry registry, Clock clock, TerminalMonitorRelayService terminalRelayService,
             TerminalRelayLifecycleService terminalRelayLifecycleService,
-            TerminalMessageRateLimiter terminalMessageRateLimiter) {
+            TerminalMessageRateLimiter terminalMessageRateLimiter, MonitorSessionTerminationService terminationService,
+            AppProperties appProperties) {
         this.objectMapper = objectMapper;
         this.serverMapper = serverMapper;
         this.registry = registry;
@@ -52,11 +57,22 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
         this.terminalRelayService = terminalRelayService;
         this.terminalRelayLifecycleService = terminalRelayLifecycleService;
         this.terminalMessageRateLimiter = terminalMessageRateLimiter;
+        this.terminationService = terminationService;
+        this.appProperties = appProperties;
     }
 
     MonitorWebSocketHandler(ObjectMapper objectMapper, ServerMapper serverMapper,
             MonitorSubscriptionRegistry registry, Clock clock) {
-        this(objectMapper, serverMapper, registry, clock, null, null, null);
+        this(objectMapper, serverMapper, registry, clock, null, null, null, null, new AppProperties());
+    }
+
+    /** 保持既有隔离测试可按终端中继依赖构造 Handler。 */
+    MonitorWebSocketHandler(ObjectMapper objectMapper, ServerMapper serverMapper,
+            MonitorSubscriptionRegistry registry, Clock clock, TerminalMonitorRelayService terminalRelayService,
+            TerminalRelayLifecycleService terminalRelayLifecycleService,
+            TerminalMessageRateLimiter terminalMessageRateLimiter) {
+        this(objectMapper, serverMapper, registry, clock, terminalRelayService, terminalRelayLifecycleService,
+                terminalMessageRateLimiter, null, new AppProperties());
     }
 
     /** 从握手属性取得用户身份并注册连接。 */
@@ -67,7 +83,11 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
             session.close(CloseStatus.POLICY_VIOLATION);
             return;
         }
-        MonitorWebSocketSession monitorSession = new MonitorWebSocketSession(session, user);
+        WebSocketSession protectedSession = new ConcurrentWebSocketSessionDecorator(session,
+                appProperties.getTerminal().getMonitorSendTimeLimitMillis(),
+                appProperties.getTerminal().getMonitorBufferSizeBytes(),
+                ConcurrentWebSocketSessionDecorator.OverflowStrategy.TERMINATE);
+        MonitorWebSocketSession monitorSession = new MonitorWebSocketSession(protectedSession, user);
         sessions.put(session.getId(), monitorSession);
         registry.register(monitorSession);
     }
@@ -85,7 +105,7 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
             body = objectMapper.readTree(message.getPayload());
         } catch (JsonProcessingException exception) {
             // 一条格式错误的 JSON 不应让整个 Monitor 连接断开，回送错误帧后保留连接。
-            sendError(session, null, ErrorCode.BAD_REQUEST);
+            sendError(monitorSession, null, ErrorCode.BAD_REQUEST);
             return;
         }
         String type = body == null || !body.has("type") || !body.get("type").isTextual()
@@ -105,7 +125,7 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
                 }
                 terminalRelayService.relay(monitorSession, terminalMessage);
             } catch (BusinessException exception) {
-                sendError(session, messageId, exception.getErrorCode());
+                sendError(monitorSession, messageId, exception.getErrorCode());
             }
             return;
         }
@@ -114,21 +134,21 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
         if (serverNode == null || serverNode.isMissingNode()
                 || !serverNode.canConvertToLong() || serverNode.longValue() <= 0) {
             // server_id 缺失或非法属于协议格式违规，发 error 帧后关闭连接。
-            sendError(session, messageId, ErrorCode.INVALID_REQUEST_PARAMETER);
+            sendError(monitorSession, messageId, ErrorCode.INVALID_REQUEST_PARAMETER);
             session.close(CloseStatus.BAD_DATA);
             return;
         }
         Long serverId = serverNode.longValue();
         if (serverMapper.selectActiveServerById(serverId) == null) {
             // 服务器不存在，发 error 帧保留连接，供前端修正后重试。
-            sendError(session, messageId, ErrorCode.RESOURCE_NOT_FOUND);
+            sendError(monitorSession, messageId, ErrorCode.RESOURCE_NOT_FOUND);
             return;
         }
         // 当前授权策略：admin 或 approved 用户均可订阅，详见类注释。
         if (!"admin".equals(monitorSession.user().role())
                 && !"approved".equals(monitorSession.user().reviewStatus())) {
             // 权限不足，发 error 帧保留连接。
-            sendError(session, messageId, ErrorCode.FORBIDDEN);
+            sendError(monitorSession, messageId, ErrorCode.FORBIDDEN);
             return;
         }
         if ("metrics.subscribe".equals(type)) {
@@ -137,7 +157,7 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
             registry.unsubscribe(monitorSession, serverId);
         } else {
             // 未知消息类型，发 error 帧保留连接。
-            sendError(session, messageId, ErrorCode.BAD_REQUEST);
+            sendError(monitorSession, messageId, ErrorCode.BAD_REQUEST);
         }
     }
 
@@ -146,13 +166,10 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         MonitorWebSocketSession monitorSession = sessions.remove(session.getId());
         if (monitorSession != null) {
-            if (terminalRelayLifecycleService != null) {
-                terminalRelayLifecycleService.closeMonitorSessions(monitorSession);
-            }
-            if (terminalMessageRateLimiter != null) {
+            terminateNormally(monitorSession);
+            if (terminationService == null && terminalMessageRateLimiter != null) {
                 terminalMessageRateLimiter.release(monitorSession);
             }
-            registry.remove(monitorSession);
         }
     }
 
@@ -164,8 +181,8 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
      * @param errorCode 业务错误码，payload 包含 code 和 message
      * @throws IOException 发送失败
      */
-    private void sendError(WebSocketSession session, String messageId, ErrorCode errorCode) throws IOException {
-        if (session.isOpen()) {
+    private void sendError(MonitorWebSocketSession session, String messageId, ErrorCode errorCode) throws IOException {
+        try {
             String body = objectMapper.createObjectNode()
                     .put("type", "error")
                     .put("message_id", messageId != null ? messageId : UUID.randomUUID().toString())
@@ -174,7 +191,28 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
                             .put("code", errorCode.getCode())
                             .put("message", errorCode.getMessage()))
                     .toString();
-            session.sendMessage(new TextMessage(body));
+            session.send(new TextMessage(body));
+        } catch (MonitorBackpressureException exception) {
+            terminateForBackpressure(session);
+        }
+    }
+
+    /** 在测试替身缺少完整协调组件时保留原有普通收口路径。 */
+    private void terminateNormally(MonitorWebSocketSession monitorSession) {
+        if (terminationService != null) {
+            terminationService.terminateNormally(monitorSession);
+        } else if (terminalRelayLifecycleService != null) {
+            terminalRelayLifecycleService.closeMonitorSessions(monitorSession);
+        }
+        registry.remove(monitorSession);
+    }
+
+    /** 将发送限额耗尽统一转换为背压收口，不能把运行时异常泄漏给 WebSocket 容器。 */
+    private void terminateForBackpressure(MonitorWebSocketSession monitorSession) {
+        if (terminationService != null) {
+            terminationService.terminateForBackpressure(monitorSession);
+        } else {
+            terminateNormally(monitorSession);
         }
     }
 }

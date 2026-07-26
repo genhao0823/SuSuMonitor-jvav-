@@ -449,6 +449,14 @@ public class AppProperties {
         @Min(value = TerminalProtocolValidator.MAX_DATA_BYTES,
                 message = "Terminal output burst must be at least the maximum terminal data bytes")
         private int outputBurstBytes = 512 * 1024;
+        // 限制浏览器 Monitor 会话单次发送的最长占用时间，防止慢消费者长期阻塞出站写入。
+        @Min(value = 1, message = "Terminal monitor send time limit must be at least one millisecond")
+        @Max(value = 60000, message = "Terminal monitor send time limit must not exceed 60000 milliseconds")
+        private int monitorSendTimeLimitMillis = 5000;
+        // 限制浏览器 Monitor 会话的待发送缓冲，超出后由 Spring 终止不可靠连接。
+        @Min(value = 1024, message = "Terminal monitor buffer size must be at least 1024 bytes")
+        @Max(value = 16 * 1024 * 1024, message = "Terminal monitor buffer size must not exceed 16777216 bytes")
+        private int monitorBufferSizeBytes = 256 * 1024;
 
         public int getMaxSessionsPerUser() { return maxSessionsPerUser; }
         public void setMaxSessionsPerUser(int value) { maxSessionsPerUser = value; }
@@ -480,6 +488,14 @@ public class AppProperties {
         public void setOutputRateBytesPerSecond(int value) { outputRateBytesPerSecond = value; }
         public int getOutputBurstBytes() { return outputBurstBytes; }
         public void setOutputBurstBytes(int value) { outputBurstBytes = value; }
+        /** 返回浏览器 Monitor 会话的发送超时限制。 */
+        public int getMonitorSendTimeLimitMillis() { return monitorSendTimeLimitMillis; }
+        /** 设置浏览器 Monitor 会话的发送超时限制。 */
+        public void setMonitorSendTimeLimitMillis(int value) { monitorSendTimeLimitMillis = value; }
+        /** 返回浏览器 Monitor 会话的待发送缓冲上限。 */
+        public int getMonitorBufferSizeBytes() { return monitorBufferSizeBytes; }
+        /** 设置浏览器 Monitor 会话的待发送缓冲上限。 */
+        public void setMonitorBufferSizeBytes(int value) { monitorBufferSizeBytes = value; }
     }
 
     /**

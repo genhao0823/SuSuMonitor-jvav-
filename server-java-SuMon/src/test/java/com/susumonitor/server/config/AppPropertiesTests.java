@@ -144,6 +144,24 @@ class AppPropertiesTests {
         assertFalse(validator.validate(properties).isEmpty());
     }
 
+    /** 验证非正 Monitor 发送时限不能通过配置校验。 */
+    @Test
+    void nonPositiveMonitorSendTimeLimitShouldFailValidation() {
+        AppProperties properties = properties(VALID_TEST_SECRET, 24);
+        properties.getTerminal().setMonitorSendTimeLimitMillis(0);
+
+        assertFalse(validator.validate(properties).isEmpty());
+    }
+
+    /** 验证过小 Monitor 缓冲不能通过配置校验。 */
+    @Test
+    void tooSmallMonitorBufferShouldFailValidation() {
+        AppProperties properties = properties(VALID_TEST_SECRET, 24);
+        properties.getTerminal().setMonitorBufferSizeBytes(1023);
+
+        assertFalse(validator.validate(properties).isEmpty());
+    }
+
     /**
      * 创建测试所需的应用配置。
      *

@@ -82,6 +82,7 @@ The broadcast never contains Agent Token, Token hash, SSH credentials, database 
 - Ticket state is single-JVM memory only; Redis and distributed session state are not implemented.
 - Metrics broadcast runs after the database transaction commits.
 - Disconnect removes all subscriptions.
+- All Java-to-browser `/ws/monitor` frames use a per-connection protected outbound session. `TERMINAL_MONITOR_SEND_TIME_LIMIT_MILLIS` defaults to `5000` and `TERMINAL_MONITOR_BUFFER_SIZE_BYTES` defaults to `262144` (256 KiB). Spring terminates a slow consumer when either limit is exceeded; Java closes associated terminal sessions with reason `monitor_backpressure`, removes subscriptions, and closes the browser session with `1011` (`SESSION_NOT_RELIABLE`).
 - Tokens and complete raw messages must not be logged.
 - Agent client IP defaults to the TCP peer address. `X-Forwarded-For` is used only when the TCP peer is within `AGENT_TRUSTED_PROXY_CIDRS`; the resolver strips trusted proxies from right to left and never trusts a direct client header.
 
@@ -152,7 +153,7 @@ The browser must never send `terminal.opened`, `terminal.output`, `terminal.clos
 
 Before forwarding an Agent terminal response, Java validates its protocol payload, verifies payload `server_id` matches the authenticated Agent connection, and verifies that `session_id` is bound to that same server. `terminal.opened` transitions metadata to `open`; normal `terminal.closed` persists closure, removes the in-memory relay binding, and releases the output bucket.
 
-When the originating Monitor connection disconnects, Java removes its relay bindings, sends a server-generated `terminal.close` to each reachable Agent, marks the related metadata closed with `monitor_disconnected`, and releases output buckets. When the current Agent connection disconnects, Java marks its routed sessions as `error` with `agent_disconnected` and releases output buckets; a superseded Agent connection cannot close sessions owned by its replacement.
+When the originating Monitor connection disconnects, Java removes its relay bindings, sends a server-generated `terminal.close` to each reachable Agent, marks the related metadata closed with `monitor_disconnected`, and releases output buckets. If the protected outbound session detects backpressure first, the reason is instead `monitor_backpressure`; this reason is not overwritten by the later WebSocket close callback. When the current Agent connection disconnects, Java marks its routed sessions as `error` with `agent_disconnected` and releases output buckets; a superseded Agent connection cannot close sessions owned by its replacement.
 
 Terminal-specific error codes are `40003` invalid payload, `40302` access denied, `40403` session not found, `40903` session state conflict, `40904` Agent offline, `42903` session limit reached, and `42904` terminal message limit reached.
 
