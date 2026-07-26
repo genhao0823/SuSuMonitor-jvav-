@@ -4,7 +4,7 @@
 **依据**: 根目录 `项目需求与规范.md`  
 **最后核对日期**: 2026-07-23
 **当前实施阶段**: MVP-5A 前端收口；下一业务阶段为 MVP-6 告警闭环
-**当前状态**: MVP-1 核心能力已实现但收口验收未全部完成；MVP-2 Go Agent 与 MVP-3 Metrics/Monitor 实时链路已完成本机运行时验收；MVP-5A 登录、仪表盘、服务器管理、用户审核和实时监控页面已实现。首管理员独立空库真实并发、真实 SSH `50003` 分类、部署环境和多实例能力仍未验证。
+**当前状态**（2026-07-27 对齐收口，最后核对日期更新为 2026-07-27）：MVP-1 核心 + MVP-2 Go Agent + MVP-3 实时监控 + MVP-5A Web 主页面 + MVP-6 告警业务后端 已闭环；MVP-7 终端 Java 中继 + Go Agent Linux PTY 已完成（PTY_RELAY_INTEGRATION_OK 2026-07-26）。真实 SSH `50003`/`50002` 分类已于 2026-07-25 通过 Apifox 验收；SSH 主机指纹业务已实现并 Apifox 9 用例 27 断言通过（2026-07-20）。仍属“未验证”：首管理员独立空库真实并发、公网部署环境、多实例及跨 JVM 事件推送、Alert 真实端到端、Monitor 1012 真实背压。
 
 当前状态以本节矩阵和最新开发日志为准，后文历史实施顺序不代表当前完成状态。
 
@@ -21,7 +21,7 @@
 | login、me、logout | 已实现 | Service 与 MockMvc 已通过 | admin/user 成功、pending/rejected 403 和 me/logout 已验证 | 未验证 |
 | 管理员审核 | 已实现 | Service 与 MockMvc 已通过 | approve/reject、重复和并发审核已验证 | 未验证 |
 | 服务器 CRUD 与凭据加密 | 已实现 | 单元与 MockMvc 已通过 | HTTP 与当前开发 MySQL 已验证；独立库未验证 | 未验证 |
-| SSH 安全与连接测试 | 已实现 | 已通过 | password/private_key 真实成功历史已验证；当前受控 WSL 的 `50003` 分类仍未验证 | 未验证 |
+| SSH 安全与连接测试 | 已实现 | 已通过 | password/private_key 真实成功、`50002`/`50003` 分类于 2026-07-25 通过 Apifox 受控 SSHD 真实验收 | 未验证 |
 | Agent Token 生命周期(register/rotate/revoke) | 已实现 | 已通过 | 真实 HTTP/Agent 链路已验证 | 未验证 |
 | Metrics 接收、存储、最新/历史查询 | 已实现 | 已通过 | 真实 Agent + MySQL 查询已验证 | 未验证 |
 | Metrics 过期清理(分批/防重叠) | 已实现 | 已通过 | 独立 MySQL 已验证 | 未验证 |
@@ -122,8 +122,8 @@ SuSuMonitor/
 | MVP-3 | 指标接收、MySQL 存储、WebSocket 推送、历史指标查询、10 天数据清理 | 指标接收/存储/查询/实时推送/清理已实现 |
 | MVP-4 | OpenAPI 契约基线收口、lint、Apifox 导入和实现漂移检查 | 随接口同步，阶段性收口 |
 | MVP-5A | 登录、注册、仪表盘、服务器列表和详情前端，直接对接真实 API | 已实现；告警与 Web SSH 不在本阶段 |
-| MVP-6 | 模块化单体告警业务闭环：规则、状态机去重、记录、查询、已读、恢复和 WebSocket 推送；暂不依赖 RabbitMQ | 否 |
-| MVP-7 | SSH 后端代理、PTY、多会话、20 分钟超时和 xterm.js 前端 | 否 |
+| MVP-6 | 模块化单体告警业务闭环：规则、状态机去重、记录、查询、已读、恢复和 WebSocket 推送；暂不依赖 RabbitMQ | 后端业务闭环已实现（Commit `7b01a60`，2026-07-25，含 Flyway `V10__create_alert_states_and_soft_delete_rules`、`AlertPushPublisher` 推送 `alert.push`、OpenAPI 6 端点）；前端告警页面未实现；真实 HTTP/WS 端到端链路未验证 |
+| MVP-7 | SSH 后端代理、PTY、多会话、20 分钟超时和 xterm.js 前端 | T1-T3 已完成（Java 端中继、Go Agent Linux PTY、协议契约），真实 WSL 单 JVM 联调通过 `PTY_RELAY_INTEGRATION_OK`（2026-07-26）；T4（xterm.js 前端）、T5（OpenCloudOS 云端部署）、T6（家庭 Linux 主机 root systemd 部署）未完成；Monitor 1012 真实背压未覆盖（2026-07-27 流控 WSL 验收） |
 | MVP-8 | 安装、启动、升级、回滚、备份恢复和安全检查文档 | 否 |
 
 当前 MVP-1 至 MVP-8 默认采用模块化单体架构。微服务只作为 MVP-8 之后的增强路线，不改变当前 MVP-1 的开发顺序，也不作为本机调试前置依赖。
@@ -1009,7 +1009,7 @@ servers.delete_token 支持软删除后同 host 重建
 
 建议按以下顺序开始实施：
 
-1. 完成 MVP-1 剩余的首管理员独立空库并发和真实 SSH `50003` 分类验收。
+1. 完成 MVP-1 剩余的首管理员独立空库真实并发验收；部署环境验证。_真实 SSH `50002`/`50003` 分类已通过（2026-07-25 Apifox 验收，见 `Develop-log/20260725-Apifox-SSH-50003-真实验收.md`、`20260725-Apifox-SSH-50002-真实验收.md`）。_
 2. 收口 MVP-5A 文档、接口契约和浏览器回归记录。
 3. 实施 MVP-6 模块化单体告警规则、状态机、记录和 `alert.push` 闭环。
 4. MVP-9 冻结 RabbitMQ 消息契约，MVP-10 实现 Outbox 可靠发布，MVP-11 实现告警幂等消费。
