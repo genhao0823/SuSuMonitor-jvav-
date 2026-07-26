@@ -1,6 +1,6 @@
 # SuSuMonitor WebSocket Protocol
 
-**Version**: 1.0
+**Version**: 1.1
 
 **Time standard**: UTC ISO-8601, for example `2026-07-21T12:00:00Z`
 
@@ -9,8 +9,8 @@
 ## Channels
 
 ```text
-/ws/agent   Agent authentication, heartbeat and metrics reporting
-/ws/monitor Browser metrics subscription and metrics.update delivery
+/ws/agent   Agent authentication, heartbeat, metrics reporting and terminal responses
+/ws/monitor Browser metrics subscription, metrics.update delivery and terminal requests
 ```
 
 The legacy requirement aliases `/api/ws/agent` and `/api/ws/client` map to the current Spring WebSocket paths above. Long-lived JWT and Agent Token must not be placed in a URL. `/ws/monitor` accepts only a one-time 30-second Monitor ticket obtained from `POST /api/ws/monitor-ticket`.
@@ -117,6 +117,36 @@ After an alert is triggered and the alert evaluation transaction commits, subscr
 ```
 
 `alert.push` reuses the `/ws/monitor` channel and `MonitorSubscriptionRegistry`. Only sessions subscribed to the affected `server_id` receive the push. The broadcast never contains Agent Token, SSH credentials, or database credentials.
+
+## Terminal Messages
+
+Terminal messages are frozen for the future root PTY relay. They are not routed by the current runtime until the terminal session module is implemented. Every message uses the common outer structure, requires a UUID `message_id`, and uses a UTC ISO-8601 `timestamp`.
+
+All users whose latest database `review_status` is `approved` may request a root terminal regardless of role. This grants control equivalent to root access on the target family Linux host. Java must recheck the latest user state for every `terminal.open`, `terminal.input`, `terminal.resize`, and `terminal.close`; it must not rely only on the Monitor handshake snapshot.
+
+Browser to `/ws/monitor`:
+
+```text
+terminal.open    payload: server_id, cols (1-300), rows (1-100)
+terminal.input   payload: session_id, data (Base64, decoded 1-16 KiB)
+terminal.resize  payload: session_id, cols (1-300), rows (1-100)
+terminal.close   payload: session_id
+```
+
+Java to `/ws/agent` uses the same four types and additionally includes `server_id`; `terminal.open` also includes the Java-generated UUID `session_id`.
+
+Agent to `/ws/agent`:
+
+```text
+terminal.opened  payload: server_id, session_id, shell
+terminal.output  payload: server_id, session_id, data (Base64, decoded 1-16 KiB)
+terminal.closed  payload: server_id, session_id, reason (1-128 chars)
+terminal.error   payload: server_id, optional session_id, code, message (1-256 chars)
+```
+
+The browser must never send `terminal.opened`, `terminal.output`, `terminal.closed`, or `terminal.error`. The Agent must never send `terminal.open`, `terminal.input`, `terminal.resize`, or `terminal.close`. Java generates `session_id`; the browser and Agent cannot choose it. Terminal input and output must not be persisted or logged.
+
+Terminal-specific error codes are `40003` invalid payload, `40302` access denied, `40403` session not found, `40903` session state conflict, `40904` Agent offline, `42903` session limit reached, and `42904` terminal message limit reached.
 
 ## Runtime Validation
 
