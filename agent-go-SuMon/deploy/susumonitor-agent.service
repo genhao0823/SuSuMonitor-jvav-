@@ -5,8 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=susumonitor
-Group=susumonitor
+User=root
+Group=root
 ExecStart=/usr/local/bin/susumonitor-agent
 EnvironmentFile=/etc/susumonitor/agent.env
 Restart=always

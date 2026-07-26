@@ -7,6 +7,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -29,6 +30,22 @@ type Config struct {
 	ReconnectMaxSeconds int
 	// LogLevel 是日志级别，如 info、debug。
 	LogLevel string
+	// TerminalEnabled 控制是否接受远程终端协议消息，默认关闭。
+	TerminalEnabled bool
+	// TerminalShell 是 Linux PTY 固定启动的 Shell，远端不得覆盖。
+	TerminalShell string
+	// TerminalMaxSessions 是 Agent 本地 PTY 会话上限。
+	TerminalMaxSessions int
+	// TerminalMaxInputBytes 是单个 Base64 解码后输入块的最大字节数。
+	TerminalMaxInputBytes int
+	// TerminalMaxOutputBytes 是单个 PTY 输出块的最大字节数。
+	TerminalMaxOutputBytes int
+	// TerminalOutputQueueSize 是每个 PTY 会话的有界输出队列大小。
+	TerminalOutputQueueSize int
+	// TerminalIdleTimeoutSeconds 是无输入自动关闭阈值。
+	TerminalIdleTimeoutSeconds int
+	// TerminalMaxLifetimeSeconds 是单会话最大生命周期。
+	TerminalMaxLifetimeSeconds int
 }
 
 // Load 从环境变量加载配置并校验。
@@ -44,9 +61,10 @@ type Config struct {
 //   - SUSUMONITOR_LOG_LEVEL
 func Load() (*Config, error) {
 	cfg := &Config{
-		BackendURL: os.Getenv("SUSUMONITOR_BACKEND_URL"),
-		AgentToken: os.Getenv("SUSUMONITOR_AGENT_TOKEN"),
-		LogLevel:   getenvDefault("SUSUMONITOR_LOG_LEVEL", "info"),
+		BackendURL:    os.Getenv("SUSUMONITOR_BACKEND_URL"),
+		AgentToken:    os.Getenv("SUSUMONITOR_AGENT_TOKEN"),
+		LogLevel:      getenvDefault("SUSUMONITOR_LOG_LEVEL", "info"),
+		TerminalShell: getenvDefault("SUSUMONITOR_TERMINAL_SHELL", "/bin/bash"),
 	}
 
 	var err error
@@ -60,6 +78,27 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	if cfg.ReconnectMaxSeconds, err = getenvIntDefault("SUSUMONITOR_RECONNECT_MAX_SECONDS", 60); err != nil {
+		return nil, err
+	}
+	if cfg.TerminalEnabled, err = getenvBoolDefault("SUSUMONITOR_TERMINAL_ENABLED", false); err != nil {
+		return nil, err
+	}
+	if cfg.TerminalMaxSessions, err = getenvIntDefault("SUSUMONITOR_TERMINAL_MAX_SESSIONS", 4); err != nil {
+		return nil, err
+	}
+	if cfg.TerminalMaxInputBytes, err = getenvIntDefault("SUSUMONITOR_TERMINAL_MAX_INPUT_BYTES", 16*1024); err != nil {
+		return nil, err
+	}
+	if cfg.TerminalMaxOutputBytes, err = getenvIntDefault("SUSUMONITOR_TERMINAL_MAX_OUTPUT_BYTES", 16*1024); err != nil {
+		return nil, err
+	}
+	if cfg.TerminalOutputQueueSize, err = getenvIntDefault("SUSUMONITOR_TERMINAL_OUTPUT_QUEUE_SIZE", 64); err != nil {
+		return nil, err
+	}
+	if cfg.TerminalIdleTimeoutSeconds, err = getenvIntDefault("SUSUMONITOR_TERMINAL_IDLE_TIMEOUT_SECONDS", 20*60); err != nil {
+		return nil, err
+	}
+	if cfg.TerminalMaxLifetimeSeconds, err = getenvIntDefault("SUSUMONITOR_TERMINAL_MAX_LIFETIME_SECONDS", 8*60*60); err != nil {
 		return nil, err
 	}
 
@@ -99,17 +138,38 @@ func (c *Config) validate() error {
 		return fmt.Errorf("reconnect max (%d) must be >= initial (%d)",
 			c.ReconnectMaxSeconds, c.ReconnectInitialSeconds)
 	}
+	if c.TerminalMaxSessions < 1 || c.TerminalMaxSessions > 4 {
+		return fmt.Errorf("terminal max sessions must be between 1 and 4")
+	}
+	if c.TerminalMaxInputBytes < 1 || c.TerminalMaxInputBytes > 16*1024 {
+		return fmt.Errorf("terminal max input bytes must be between 1 and 16384")
+	}
+	if c.TerminalMaxOutputBytes < 1 || c.TerminalMaxOutputBytes > 16*1024 {
+		return fmt.Errorf("terminal max output bytes must be between 1 and 16384")
+	}
+	if c.TerminalOutputQueueSize < 1 || c.TerminalOutputQueueSize > 64 {
+		return fmt.Errorf("terminal output queue size must be between 1 and 64")
+	}
+	if c.TerminalIdleTimeoutSeconds < 1 || c.TerminalMaxLifetimeSeconds < 1 {
+		return fmt.Errorf("terminal timeouts must be positive")
+	}
+	if c.TerminalEnabled && (!filepath.IsAbs(c.TerminalShell) || filepath.Clean(c.TerminalShell) != c.TerminalShell) {
+		return fmt.Errorf("SUSUMONITOR_TERMINAL_SHELL must be a clean absolute path")
+	}
 	return nil
 }
 
-// TokenPrefix 返回 agent_token 的前 8 字符，用于日志脱敏。
-//
-// 完整 token 不得输出到日志。
-func (c *Config) TokenPrefix() string {
-	if len(c.AgentToken) <= 8 {
-		return c.AgentToken
+// getenvBoolDefault 读取严格的布尔环境变量。
+func getenvBoolDefault(key string, def bool) (bool, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return def, nil
 	}
-	return c.AgentToken[:8]
+	parsed, err := strconv.ParseBool(v)
+	if err != nil {
+		return false, fmt.Errorf("%s must be a boolean, got %q", key, v)
+	}
+	return parsed, nil
 }
 
 // getenvDefault 读取环境变量，为空时返回默认值。

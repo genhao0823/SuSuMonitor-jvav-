@@ -49,6 +49,66 @@ type MetricsPayload struct {
 	LoadAvg       *float64 `json:"load_avg"`
 }
 
+// TerminalOpenPayload 是服务端要求 Agent 创建本地 PTY 的固定参数。
+type TerminalOpenPayload struct {
+	ServerID  int64  `json:"server_id,omitempty"`
+	SessionID string `json:"session_id"`
+	Cols      uint16 `json:"cols"`
+	Rows      uint16 `json:"rows"`
+}
+
+// TerminalInputPayload 是 Base64 编码的 PTY 输入字节。
+type TerminalInputPayload struct {
+	ServerID  int64  `json:"server_id,omitempty"`
+	SessionID string `json:"session_id"`
+	Data      string `json:"data"`
+}
+
+// TerminalResizePayload 表示 PTY 新尺寸。
+type TerminalResizePayload struct {
+	ServerID  int64  `json:"server_id,omitempty"`
+	SessionID string `json:"session_id"`
+	Cols      uint16 `json:"cols"`
+	Rows      uint16 `json:"rows"`
+}
+
+// TerminalClosePayload 要求关闭指定 PTY。
+type TerminalClosePayload struct {
+	ServerID  int64  `json:"server_id,omitempty"`
+	SessionID string `json:"session_id"`
+	Reason    string `json:"reason"`
+}
+
+// TerminalOpenedPayload 确认 PTY 已创建。
+type TerminalOpenedPayload struct {
+	ServerID  int64  `json:"server_id"`
+	SessionID string `json:"session_id"`
+	Shell     string `json:"shell"`
+}
+
+// TerminalOutputPayload 是 Base64 编码的 PTY 输出字节。
+type TerminalOutputPayload struct {
+	ServerID  int64  `json:"server_id"`
+	SessionID string `json:"session_id"`
+	Data      string `json:"data"`
+}
+
+// TerminalClosedPayload 表示 PTY 已退出或被关闭。
+type TerminalClosedPayload struct {
+	ServerID  int64  `json:"server_id"`
+	SessionID string `json:"session_id"`
+	Reason    string `json:"reason"`
+	ExitCode  *int   `json:"exit_code,omitempty"`
+}
+
+// TerminalErrorPayload 只返回稳定错误码和安全错误消息。
+type TerminalErrorPayload struct {
+	ServerID  int64  `json:"server_id"`
+	SessionID string `json:"session_id,omitempty"`
+	Code      int    `json:"code"`
+	Message   string `json:"message"`
+}
+
 // newMessage 构造通用 WebSocket 消息，自动生成 message_id 和 timestamp。
 //
 // timestamp 使用 UTC ISO-8601（RFC3339Nano），与后端 OffsetDateTime.toString() 兼容。
@@ -60,6 +120,18 @@ func newMessage(msgType string, payload interface{}) AgentMessage {
 		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
 		Payload:   payloadBytes,
 	}
+}
+
+// NewMessage 创建需要由外部模块发送的 Agent 协议消息。
+func NewMessage(msgType string, payload interface{}) AgentMessage {
+	return newMessage(msgType, payload)
+}
+
+// NewMessageWithID 创建关联既有请求的 Agent 协议消息。
+func NewMessageWithID(msgType string, messageID string, payload interface{}) AgentMessage {
+	message := newMessage(msgType, payload)
+	message.MessageID = messageID
+	return message
 }
 
 // newAuthMessage 构造 agent.authenticate 首帧消息。

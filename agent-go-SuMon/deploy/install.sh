@@ -11,7 +11,6 @@
 #   3. 以 root 权限执行。
 #
 # 本脚本完成以下操作：
-#   - 创建 susumonitor 系统用户
 #   - 拷贝二进制到 /usr/local/bin/
 #   - 创建配置目录 /etc/susumonitor/
 #   - 创建日志目录 /var/log/susumonitor/
@@ -60,14 +59,6 @@ SERVICE_FILE="/etc/systemd/system/susumonitor-agent.service"
 LOGROTATE_FILE="/etc/logrotate.d/susumonitor-agent"
 BINARY_DEST="${INSTALL_DIR}/susumonitor-agent"
 
-# 创建专用系统用户（如果不存在）。
-if ! id -u susumonitor >/dev/null 2>&1; then
-    info "Creating system user 'susumonitor'..."
-    useradd --system --no-create-home --shell /usr/sbin/nologin susumonitor
-else
-    info "User 'susumonitor' already exists."
-fi
-
 # 拷贝二进制。
 info "Installing binary to ${BINARY_DEST}..."
 install -m 0755 "${BINARY}" "${BINARY_DEST}"
@@ -80,10 +71,12 @@ mkdir -p "${CONFIG_DIR}"
 ENV_TEMPLATE="${SCRIPT_DIR}/agent.env"
 if [ -f "${ENV_TEMPLATE}" ]; then
     if [ -f "${CONFIG_DIR}/agent.env" ]; then
-        warn "${CONFIG_DIR}/agent.env already exists, skipping. Edit it manually if needed."
+        warn "${CONFIG_DIR}/agent.env already exists, keeping its content and enforcing root-only permissions."
+        chown root:root "${CONFIG_DIR}/agent.env"
+        chmod 0600 "${CONFIG_DIR}/agent.env"
     else
         info "Installing env template to ${CONFIG_DIR}/agent.env..."
-        install -m 0640 -o susumonitor -g susumonitor "${ENV_TEMPLATE}" "${CONFIG_DIR}/agent.env"
+        install -m 0600 -o root -g root "${ENV_TEMPLATE}" "${CONFIG_DIR}/agent.env"
     fi
 else
     warn "agent.env template not found in ${SCRIPT_DIR}. Create ${CONFIG_DIR}/agent.env manually."
@@ -92,7 +85,7 @@ fi
 # 创建日志目录。
 info "Creating log directory ${LOG_DIR}..."
 mkdir -p "${LOG_DIR}"
-chown susumonitor:susumonitor "${LOG_DIR}"
+chown root:root "${LOG_DIR}"
 chmod 0755 "${LOG_DIR}"
 
 # 拷贝 logrotate 配置。

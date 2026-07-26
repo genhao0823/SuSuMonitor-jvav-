@@ -1,7 +1,6 @@
 // Package main 是 SuSuMonitor Agent 的启动入口。
 //
-// 阶段 2：加载配置并启动 WebSocket 客户端，实现连接、鉴权、心跳和重连。
-// 指标采集和上报在阶段 3-4 接入。
+// 加载配置并启动 WebSocket、指标采集和指标上报。
 package main
 
 import (
@@ -32,7 +31,6 @@ func main() {
 	logger.Info("susumonitor agent starting",
 		"backend_url", cfg.BackendURL,
 		"server_id", cfg.ServerID,
-		"token_prefix", cfg.TokenPrefix(),
 		"collect_interval", cfg.CollectIntervalSeconds,
 		"heartbeat_interval", cfg.HeartbeatIntervalSeconds,
 	)
@@ -46,6 +44,15 @@ func main() {
 		time.Duration(cfg.ReconnectInitialSeconds)*time.Second,
 		time.Duration(cfg.ReconnectMaxSeconds)*time.Second,
 	)
+	terminalAgent, err := newTerminalAgent(cfg, client, logger)
+	if err != nil {
+		logger.Error("terminal initialization failed", "error", err)
+		os.Exit(1)
+	}
+	client.SetMessageHandler(terminalAgent.handle)
+	client.SetDisconnectHandler(func() {
+		terminalAgent.manager.CloseAll("agent_disconnected")
+	})
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -54,6 +61,7 @@ func main() {
 		logger.Error("agent exited with error", "error", err)
 		os.Exit(1)
 	}
+	terminalAgent.manager.CloseAll("agent_shutdown")
 	logger.Info("agent shutdown complete")
 }
 

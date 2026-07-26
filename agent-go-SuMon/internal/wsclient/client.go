@@ -39,6 +39,22 @@ type Client struct {
 	reconnectMax      time.Duration
 	connectionMu      sync.RWMutex
 	connection        *websocket.Conn
+	messageHandler    func(context.Context, AgentMessage)
+	disconnectHandler func()
+}
+
+// SetMessageHandler 设置认证后服务端消息处理器。
+//
+// 调用方必须在 Run 前设置，运行期间不允许更换处理器。
+func (c *Client) SetMessageHandler(handler func(context.Context, AgentMessage)) {
+	c.messageHandler = handler
+}
+
+// SetDisconnectHandler 设置已认证连接断开时的清理回调。
+//
+// 调用方必须在 Run 前设置，运行期间不允许更换处理器。
+func (c *Client) SetDisconnectHandler(handler func()) {
+	c.disconnectHandler = handler
 }
 
 // NewClient 创建 WebSocket 客户端。
@@ -98,6 +114,9 @@ func (c *Client) Run(ctx context.Context) error {
 			c.connection = nil
 		}
 		c.connectionMu.Unlock()
+		if c.disconnectHandler != nil {
+			c.disconnectHandler()
+		}
 		conn.CloseNow()
 
 		if err := ctx.Err(); err != nil {
@@ -192,7 +211,7 @@ func (c *Client) runLoops(ctx context.Context, conn *websocket.Conn) error {
 				errCh <- fmt.Errorf("read: %w", err)
 				return
 			}
-			c.handleMessage(msg)
+			c.handleMessage(ctx, msg)
 		}
 	}()
 
@@ -214,7 +233,7 @@ func (c *Client) sendHeartbeat(ctx context.Context, conn *websocket.Conn) error 
 // handleMessage 处理接收到的服务端消息。
 //
 // heartbeat.ack → Debug 日志；error → 提取 message 字段 → Warn 日志；default → Debug。
-func (c *Client) handleMessage(msg AgentMessage) {
+func (c *Client) handleMessage(ctx context.Context, msg AgentMessage) {
 	switch msg.Type {
 	case "heartbeat.ack":
 		c.logger.Debug("heartbeat ack received", "message_id", msg.MessageID)
@@ -224,12 +243,30 @@ func (c *Client) handleMessage(msg AgentMessage) {
 		}
 		if err := json.Unmarshal(msg.Payload, &errPayload); err == nil && errPayload.Message != "" {
 			c.logger.Warn("server error", "message", errPayload.Message)
-		} else {
-			c.logger.Warn("server error", "raw_payload", string(msg.Payload))
+			return
 		}
+		c.logger.Warn("server error payload is invalid")
 	default:
+		if c.messageHandler != nil {
+			c.messageHandler(ctx, msg)
+			return
+		}
 		c.logger.Debug("received message", "type", msg.Type)
 	}
+}
+
+// SendMessage 通过当前已认证连接发送任意 Agent 协议消息。
+func (c *Client) SendMessage(ctx context.Context, message AgentMessage) error {
+	c.connectionMu.RLock()
+	conn := c.connection
+	c.connectionMu.RUnlock()
+	if conn == nil {
+		return fmt.Errorf("send message: agent is not authenticated")
+	}
+	if err := wsjson.Write(ctx, conn, message); err != nil {
+		return fmt.Errorf("write message: %w", err)
+	}
+	return nil
 }
 
 // SendMetrics 通过当前已认证连接发送 metrics.report 消息。

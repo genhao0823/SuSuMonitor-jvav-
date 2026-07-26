@@ -12,6 +12,14 @@ func setValidEnvironment(t *testing.T) {
 	t.Setenv("SUSUMONITOR_RECONNECT_INITIAL_SECONDS", "5")
 	t.Setenv("SUSUMONITOR_RECONNECT_MAX_SECONDS", "60")
 	t.Setenv("SUSUMONITOR_LOG_LEVEL", "debug")
+	t.Setenv("SUSUMONITOR_TERMINAL_ENABLED", "false")
+	t.Setenv("SUSUMONITOR_TERMINAL_SHELL", "/bin/bash")
+	t.Setenv("SUSUMONITOR_TERMINAL_MAX_SESSIONS", "4")
+	t.Setenv("SUSUMONITOR_TERMINAL_MAX_INPUT_BYTES", "16384")
+	t.Setenv("SUSUMONITOR_TERMINAL_MAX_OUTPUT_BYTES", "16384")
+	t.Setenv("SUSUMONITOR_TERMINAL_OUTPUT_QUEUE_SIZE", "64")
+	t.Setenv("SUSUMONITOR_TERMINAL_IDLE_TIMEOUT_SECONDS", "1200")
+	t.Setenv("SUSUMONITOR_TERMINAL_MAX_LIFETIME_SECONDS", "28800")
 }
 
 // TestLoadValidConfig 验证合法环境变量能完整加载并覆盖默认值。
@@ -46,10 +54,16 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		{"zero collect interval", "SUSUMONITOR_COLLECT_INTERVAL_SECONDS", "0"},
 		{"zero heartbeat interval", "SUSUMONITOR_HEARTBEAT_INTERVAL_SECONDS", "0"},
 		{"zero reconnect initial", "SUSUMONITOR_RECONNECT_INITIAL_SECONDS", "0"},
+		{"terminal sessions too large", "SUSUMONITOR_TERMINAL_MAX_SESSIONS", "5"},
+		{"terminal input too large", "SUSUMONITOR_TERMINAL_MAX_INPUT_BYTES", "16385"},
+		{"terminal relative shell", "SUSUMONITOR_TERMINAL_SHELL", "bash"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			setValidEnvironment(t)
+			if tt.key == "SUSUMONITOR_TERMINAL_SHELL" {
+				t.Setenv("SUSUMONITOR_TERMINAL_ENABLED", "true")
+			}
 			t.Setenv(tt.key, tt.value)
 			if _, err := Load(); err == nil {
 				t.Fatal("Load() error = nil, want validation error")
