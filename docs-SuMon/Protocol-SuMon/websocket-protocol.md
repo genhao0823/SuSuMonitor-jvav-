@@ -120,7 +120,7 @@ After an alert is triggered and the alert evaluation transaction commits, subscr
 
 ## Terminal Messages
 
-Terminal messages are frozen for the future root PTY relay. They are not routed by the current runtime until the terminal session module is implemented. Every message uses the common outer structure, requires a UUID `message_id`, and uses a UTC ISO-8601 `timestamp`.
+Terminal messages use the common outer structure, require a UUID `message_id`, and use a UTC ISO-8601 `timestamp`. Java currently accepts and routes browser control frames to the matching authenticated Agent; Agent response routing is implemented separately.
 
 All users whose latest database `review_status` is `approved` may request a root terminal regardless of role. This grants control equivalent to root access on the target family Linux host. Java must recheck the latest user state for every `terminal.open`, `terminal.input`, `terminal.resize`, and `terminal.close`; it must not rely only on the Monitor handshake snapshot.
 
@@ -134,6 +134,8 @@ terminal.close   payload: session_id
 ```
 
 Java to `/ws/agent` uses the same four types and additionally includes `server_id`; `terminal.open` also includes the Java-generated UUID `session_id`.
+
+For every browser control frame, Java rechecks the user's current `approved` status and the session ownership in persistent metadata. It then resolves the `session_id` through the single-JVM relay registry and serializes writes to the target Agent connection. Browser-supplied `server_id` and `session_id` are never trusted for existing sessions; Java injects the persisted values before forwarding.
 
 Agent to `/ws/agent`:
 

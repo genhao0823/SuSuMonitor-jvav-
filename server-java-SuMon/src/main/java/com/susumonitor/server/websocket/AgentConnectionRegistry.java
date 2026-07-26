@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
 import org.springframework.stereotype.Component;
 
 /**
@@ -38,6 +39,13 @@ public class AgentConnectionRegistry {
     /** 返回当前连接快照，供心跳过期扫描使用。 */
     public Collection<AgentWebSocketSession> sessions() {
         return sessions.values();
+    }
+
+    /** 向指定服务器当前已认证 Agent 串行发送终端控制帧。 */
+    public boolean sendToServer(Long serverId, TextMessage message) throws IOException {
+        String sessionId = serverSessions.get(serverId);
+        AgentWebSocketSession session = sessionId == null ? null : sessions.get(sessionId);
+        return session != null && session.send(message);
     }
 
     /** 关闭并移除指定服务器的连接。 */

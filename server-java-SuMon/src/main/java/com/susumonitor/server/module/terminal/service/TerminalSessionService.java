@@ -14,6 +14,9 @@ public interface TerminalSessionService {
     /** 记录已接受的控制活动，不接受终端内容。 */
     void touchSession(String sessionId);
 
+    /** 回查最新审核状态并验证用户拥有仍可操作的会话。 */
+    TerminalSessionEntity requireActiveSession(Long userId, String sessionId);
+
     /** 关闭会话，重复关闭保持幂等。 */
     void closeSession(String sessionId, String status, String reason);
 

@@ -4,6 +4,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.TextMessage;
+import java.io.IOException;
 
 /**
  * 保存 Agent WebSocket 的认证归属和最近心跳，不保存明文 Token。
@@ -67,5 +69,14 @@ public final class AgentWebSocketSession {
 
     public void heartbeat(LocalDateTime heartbeatAt) {
         this.lastHeartbeatAt = heartbeatAt;
+    }
+
+    /** 串行化对单个 Agent Socket 的写入，避免并发中继帧交错。 */
+    public synchronized boolean send(TextMessage message) throws IOException {
+        if (!socketSession.isOpen()) {
+            return false;
+        }
+        socketSession.sendMessage(message);
+        return true;
     }
 }

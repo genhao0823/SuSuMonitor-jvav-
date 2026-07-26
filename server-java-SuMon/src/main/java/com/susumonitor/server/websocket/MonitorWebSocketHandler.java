@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susumonitor.server.common.ErrorCode;
+import com.susumonitor.server.common.BusinessException;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import com.susumonitor.server.security.AuthenticatedUser;
 import java.io.IOException;
@@ -13,6 +14,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -32,15 +34,23 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
     private final ServerMapper serverMapper;
     private final MonitorSubscriptionRegistry registry;
     private final Clock clock;
+    private final TerminalMonitorRelayService terminalRelayService;
     private final Map<String, MonitorWebSocketSession> sessions = new ConcurrentHashMap<>();
 
     /** 注入 JSON、服务器权限查询和订阅注册表。 */
+    @Autowired
     public MonitorWebSocketHandler(ObjectMapper objectMapper, ServerMapper serverMapper,
-            MonitorSubscriptionRegistry registry, Clock clock) {
+            MonitorSubscriptionRegistry registry, Clock clock, TerminalMonitorRelayService terminalRelayService) {
         this.objectMapper = objectMapper;
         this.serverMapper = serverMapper;
         this.registry = registry;
         this.clock = clock;
+        this.terminalRelayService = terminalRelayService;
+    }
+
+    MonitorWebSocketHandler(ObjectMapper objectMapper, ServerMapper serverMapper,
+            MonitorSubscriptionRegistry registry, Clock clock) {
+        this(objectMapper, serverMapper, registry, clock, null);
     }
 
     /** 从握手属性取得用户身份并注册连接。 */
@@ -77,6 +87,19 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
         // 从消息体提取 message_id，用于 error 帧关联客户端请求。
         String messageId = body != null && body.has("message_id") && body.get("message_id").isTextual()
                 ? body.get("message_id").textValue() : null;
+        if (type.startsWith("terminal.")) {
+            try {
+                TerminalMessage terminalMessage = objectMapper.treeToValue(body, TerminalMessage.class);
+                TerminalProtocolValidator.validateMonitorMessage(terminalMessage);
+                if (terminalRelayService == null) {
+                    throw new BusinessException(ErrorCode.TERMINAL_AGENT_OFFLINE);
+                }
+                terminalRelayService.relay(monitorSession, terminalMessage);
+            } catch (BusinessException exception) {
+                sendError(session, messageId, exception.getErrorCode());
+            }
+            return;
+        }
         // path 在缺失时返回 MissingNode 而非 null，用 isMissingNode 表意更清晰。
         JsonNode serverNode = body == null ? null : body.path("payload").path("server_id");
         if (serverNode == null || serverNode.isMissingNode()

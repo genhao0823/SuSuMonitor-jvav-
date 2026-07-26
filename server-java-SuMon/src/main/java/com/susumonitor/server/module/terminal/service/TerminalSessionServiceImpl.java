@@ -85,6 +85,27 @@ public class TerminalSessionServiceImpl implements TerminalSessionService {
 
     /** {@inheritDoc} */
     @Override
+    public TerminalSessionEntity requireActiveSession(Long userId, String sessionId) {
+        UserEntity user = userMapper.selectAuthenticationUserById(userId);
+        if (user == null || !"approved".equals(user.getReviewStatus())) {
+            throw new BusinessException(ErrorCode.TERMINAL_ACCESS_DENIED);
+        }
+        TerminalSessionEntity session = sessionMapper.selectBySessionId(sessionId);
+        if (session == null) {
+            throw new BusinessException(ErrorCode.TERMINAL_SESSION_NOT_FOUND);
+        }
+        if (!userId.equals(session.getUserId())) {
+            throw new BusinessException(ErrorCode.TERMINAL_ACCESS_DENIED);
+        }
+        if (!TerminalSessionStatus.OPENING.value().equals(session.getStatus())
+                && !TerminalSessionStatus.OPEN.value().equals(session.getStatus())) {
+            throw new BusinessException(ErrorCode.TERMINAL_SESSION_STATE_CONFLICT);
+        }
+        return session;
+    }
+
+    /** {@inheritDoc} */
+    @Override
     public void closeSession(String sessionId, String status, String reason) {
         sessionMapper.closeSession(sessionId, status, reason, LocalDateTime.now(clock));
     }
