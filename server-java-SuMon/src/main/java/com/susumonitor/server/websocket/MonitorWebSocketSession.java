@@ -44,8 +44,12 @@ public final class MonitorWebSocketSession {
         return terminationStarted.compareAndSet(false, true);
     }
 
-    /** 串行化向单个浏览器连接的写入，避免终端输出与指标推送帧交错。 */
-    public synchronized boolean send(TextMessage message) throws IOException {
+    /**
+     * 通过 Spring 装饰器写入单个浏览器连接，使慢发送期间的后续消息进入受限缓冲而非阻塞调用线程。
+     *
+     * <p>不能在此方法外加 synchronized；装饰器本身负责串行写入，外层锁会阻止后续发送进入缓冲和超额终止逻辑。</p>
+     */
+    public boolean send(TextMessage message) throws IOException {
         if (!socketSession.isOpen()) {
             return false;
         }
