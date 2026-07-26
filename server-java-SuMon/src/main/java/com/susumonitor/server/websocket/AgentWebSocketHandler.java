@@ -46,6 +46,7 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
     private final AgentMessageRateLimiter messageRateLimiter;
     private final TaskScheduler taskScheduler;
     private final TerminalAgentRelayService terminalRelayService;
+    private final TerminalRelayLifecycleService terminalRelayLifecycleService;
     private final Map<String, AgentWebSocketSession> pendingSessions = new ConcurrentHashMap<>();
 
     /** 注入生产运行所需 JSON、鉴权、心跳、连接和资源限制依赖。 */
@@ -59,7 +60,8 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
             Clock clock,
             AgentConnectionLimiter connectionLimiter,
             AgentMessageRateLimiter messageRateLimiter,
-            TaskScheduler taskScheduler, TerminalAgentRelayService terminalRelayService) {
+            TaskScheduler taskScheduler, TerminalAgentRelayService terminalRelayService,
+            TerminalRelayLifecycleService terminalRelayLifecycleService) {
         this.objectMapper = objectMapper;
         this.authenticationService = authenticationService;
         this.heartbeatService = heartbeatService;
@@ -70,6 +72,7 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
         this.messageRateLimiter = messageRateLimiter;
         this.taskScheduler = taskScheduler;
         this.terminalRelayService = terminalRelayService;
+        this.terminalRelayLifecycleService = terminalRelayLifecycleService;
     }
 
     /** 保留单元测试构造入口；生产 Spring 注入使用包含资源限制器的唯一构造器。 */
@@ -77,7 +80,7 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
             AgentHeartbeatService heartbeatService, AgentConnectionRegistry connectionRegistry,
             MetricsService metricsService, Clock clock) {
         this(objectMapper, authenticationService, heartbeatService, connectionRegistry, metricsService, clock,
-                null, null, null, null);
+                null, null, null, null, null);
     }
 
     /** 为现有限流测试保留的构造入口，终端响应中继由完整生产构造器注入。 */
@@ -86,7 +89,7 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
             MetricsService metricsService, Clock clock, AgentConnectionLimiter connectionLimiter,
             AgentMessageRateLimiter messageRateLimiter, TaskScheduler taskScheduler) {
         this(objectMapper, authenticationService, heartbeatService, connectionRegistry, metricsService, clock,
-                connectionLimiter, messageRateLimiter, taskScheduler, null);
+                connectionLimiter, messageRateLimiter, taskScheduler, null, null);
     }
 
     /** 保存新连接，等待其发送首帧认证。 */
@@ -176,6 +179,9 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession socketSession, CloseStatus status) {
         AgentWebSocketSession session = pendingSessions.remove(socketSession.getId());
         if (session != null && session.authenticated()) {
+            if (terminalRelayLifecycleService != null) {
+                terminalRelayLifecycleService.closeAgentSessions(session);
+            }
             connectionRegistry.remove(session);
         }
         if (connectionLimiter != null) {

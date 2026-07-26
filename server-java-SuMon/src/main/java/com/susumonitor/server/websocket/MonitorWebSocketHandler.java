@@ -35,22 +35,25 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
     private final MonitorSubscriptionRegistry registry;
     private final Clock clock;
     private final TerminalMonitorRelayService terminalRelayService;
+    private final TerminalRelayLifecycleService terminalRelayLifecycleService;
     private final Map<String, MonitorWebSocketSession> sessions = new ConcurrentHashMap<>();
 
     /** 注入 JSON、服务器权限查询和订阅注册表。 */
     @Autowired
     public MonitorWebSocketHandler(ObjectMapper objectMapper, ServerMapper serverMapper,
-            MonitorSubscriptionRegistry registry, Clock clock, TerminalMonitorRelayService terminalRelayService) {
+            MonitorSubscriptionRegistry registry, Clock clock, TerminalMonitorRelayService terminalRelayService,
+            TerminalRelayLifecycleService terminalRelayLifecycleService) {
         this.objectMapper = objectMapper;
         this.serverMapper = serverMapper;
         this.registry = registry;
         this.clock = clock;
         this.terminalRelayService = terminalRelayService;
+        this.terminalRelayLifecycleService = terminalRelayLifecycleService;
     }
 
     MonitorWebSocketHandler(ObjectMapper objectMapper, ServerMapper serverMapper,
             MonitorSubscriptionRegistry registry, Clock clock) {
-        this(objectMapper, serverMapper, registry, clock, null);
+        this(objectMapper, serverMapper, registry, clock, null, null);
     }
 
     /** 从握手属性取得用户身份并注册连接。 */
@@ -137,6 +140,9 @@ public class MonitorWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         MonitorWebSocketSession monitorSession = sessions.remove(session.getId());
         if (monitorSession != null) {
+            if (terminalRelayLifecycleService != null) {
+                terminalRelayLifecycleService.closeMonitorSessions(monitorSession);
+            }
             registry.remove(monitorSession);
         }
     }

@@ -150,6 +150,8 @@ The browser must never send `terminal.opened`, `terminal.output`, `terminal.clos
 
 Before forwarding an Agent terminal response, Java validates its protocol payload, verifies payload `server_id` matches the authenticated Agent connection, and verifies that `session_id` is bound to that same server. `terminal.opened` transitions metadata to `open`; `terminal.closed` persists closure and removes the in-memory relay binding after delivery.
 
+When the originating Monitor connection disconnects, Java removes its relay bindings, sends a server-generated `terminal.close` to each reachable Agent, and marks the related metadata closed. When the current Agent connection disconnects, Java marks its routed sessions as `error`; a superseded Agent connection cannot close sessions owned by its replacement.
+
 Terminal-specific error codes are `40003` invalid payload, `40302` access denied, `40403` session not found, `40903` session state conflict, `40904` Agent offline, `42903` session limit reached, and `42904` terminal message limit reached.
 
 ## Runtime Validation

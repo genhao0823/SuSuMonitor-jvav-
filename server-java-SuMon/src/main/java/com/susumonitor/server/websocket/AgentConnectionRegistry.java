@@ -48,6 +48,11 @@ public class AgentConnectionRegistry {
         return session != null && session.send(message);
     }
 
+    /** 判断连接是否仍是其服务器当前生效的 Agent，供断连收口排除被替换的旧连接。 */
+    public boolean isCurrent(AgentWebSocketSession session) {
+        return session.authenticated() && session.equals(sessions.get(serverSessions.get(session.serverId())));
+    }
+
     /** 关闭并移除指定服务器的连接。 */
     public void closeByServerId(Long serverId, CloseStatus closeStatus) {
         String sessionId = serverSessions.remove(serverId);

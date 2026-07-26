@@ -35,6 +35,9 @@ public class TerminalAgentRelayService {
             throw new BusinessException(ErrorCode.TERMINAL_ACCESS_DENIED);
         }
         String sessionId = message.payload().path("session_id").asText(null);
+        if (sessionId == null && TerminalMessageType.TERMINAL_ERROR.value().equals(message.type())) {
+            return;
+        }
         TerminalRelayRegistry.TerminalRelayBinding binding = sessionId == null ? null : relayRegistry.get(sessionId);
         if (binding == null || !binding.serverId().equals(serverId)) {
             throw new BusinessException(ErrorCode.TERMINAL_SESSION_NOT_FOUND);
