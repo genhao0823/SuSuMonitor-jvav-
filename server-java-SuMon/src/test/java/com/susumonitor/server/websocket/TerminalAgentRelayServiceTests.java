@@ -5,12 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susumonitor.server.common.BusinessException;
 import com.susumonitor.server.common.ErrorCode;
+import com.susumonitor.server.module.terminal.enums.TerminalSessionStatus;
 import com.susumonitor.server.module.terminal.service.TerminalSessionService;
 import java.time.Clock;
 import java.time.Instant;
@@ -34,8 +36,8 @@ class TerminalAgentRelayServiceTests {
         MonitorWebSocketSession monitor = monitor();
         registry.bind(SESSION_ID, 9L, monitor);
         AgentWebSocketSession agent = agent(9L);
-        TerminalAgentRelayService service = new TerminalAgentRelayService(sessions, registry, OBJECT_MAPPER,
-                Clock.fixed(Instant.parse("2026-07-26T00:00:00Z"), ZoneOffset.UTC));
+        TerminalAgentRelayService service = service(sessions, registry, mock(TerminalOutputRateLimiter.class),
+                mock(TerminalRelayLifecycleService.class));
 
         service.relay(agent, message("terminal.opened", "session_id", SESSION_ID, "shell", "bash"));
 
@@ -48,13 +50,61 @@ class TerminalAgentRelayServiceTests {
     void responseShouldRejectDifferentAgentServer() {
         TerminalRelayRegistry registry = new TerminalRelayRegistry();
         registry.bind(SESSION_ID, 9L, monitor());
-        TerminalAgentRelayService service = new TerminalAgentRelayService(mock(TerminalSessionService.class), registry,
-                OBJECT_MAPPER, Clock.systemUTC());
+        TerminalAgentRelayService service = service(mock(TerminalSessionService.class), registry,
+                mock(TerminalOutputRateLimiter.class), mock(TerminalRelayLifecycleService.class));
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> service.relay(agent(8L), message("terminal.opened", "session_id", SESSION_ID, "shell", "bash")));
 
         assertEquals(ErrorCode.TERMINAL_ACCESS_DENIED, exception.getErrorCode());
+    }
+
+    /** 超额输出不得发送到 Monitor，必须由生命周期服务关闭绑定并通知 Agent。 */
+    @Test
+    void overLimitOutputShouldCloseBindingWithoutForwardingToMonitor() throws Exception {
+        TerminalRelayRegistry registry = new TerminalRelayRegistry();
+        MonitorWebSocketSession monitor = monitor();
+        registry.bind(SESSION_ID, 9L, monitor);
+        TerminalSessionService sessions = mock(TerminalSessionService.class);
+        AgentConnectionRegistry agents = mock(AgentConnectionRegistry.class);
+        when(agents.sendToServer(eq(9L), any(TextMessage.class))).thenReturn(true);
+        TerminalOutputRateLimiter limiter = mock(TerminalOutputRateLimiter.class);
+        when(limiter.allow(eq(SESSION_ID), any())).thenReturn(false);
+        TerminalRelayLifecycleService lifecycle = new TerminalRelayLifecycleService(sessions, registry, agents, limiter,
+                OBJECT_MAPPER, Clock.fixed(Instant.parse("2026-07-26T00:00:00Z"), ZoneOffset.UTC));
+
+        service(sessions, registry, limiter, lifecycle).relay(agent(9L),
+                message("terminal.output", "session_id", SESSION_ID, "data", "YQ=="));
+
+        verify(agents).sendToServer(eq(9L), any(TextMessage.class));
+        verify(sessions).closeSession(SESSION_ID, TerminalSessionStatus.CLOSED.value(), "output_rate_exceeded");
+        verify(limiter).release(SESSION_ID);
+        verify(monitor.socketSession(), never()).sendMessage(any(TextMessage.class));
+        org.junit.jupiter.api.Assertions.assertNull(registry.get(SESSION_ID));
+    }
+
+    /** 正常关闭必须委托生命周期服务释放输出桶并移除会话绑定。 */
+    @Test
+    void closedShouldUseLifecycleClosureBeforeForwarding() throws Exception {
+        TerminalSessionService sessions = mock(TerminalSessionService.class);
+        TerminalRelayRegistry registry = new TerminalRelayRegistry();
+        MonitorWebSocketSession monitor = monitor();
+        registry.bind(SESSION_ID, 9L, monitor);
+        TerminalRelayLifecycleService lifecycle = mock(TerminalRelayLifecycleService.class);
+
+        service(sessions, registry, mock(TerminalOutputRateLimiter.class), lifecycle).relay(agent(9L),
+                message("terminal.closed", "session_id", SESSION_ID, "reason", "shell_exit"));
+
+        verify(lifecycle).closeBinding(eq(registry.get(SESSION_ID)), eq(TerminalSessionStatus.CLOSED.value()),
+                eq("shell_exit"));
+        verify(monitor.socketSession()).sendMessage(any(TextMessage.class));
+    }
+
+    /** 构造受测服务并固定时间戳来源，避免断言受系统时钟影响。 */
+    private TerminalAgentRelayService service(TerminalSessionService sessions, TerminalRelayRegistry registry,
+            TerminalOutputRateLimiter limiter, TerminalRelayLifecycleService lifecycle) {
+        return new TerminalAgentRelayService(sessions, registry, limiter, lifecycle, OBJECT_MAPPER,
+                Clock.fixed(Instant.parse("2026-07-26T00:00:00Z"), ZoneOffset.UTC));
     }
 
     private TerminalMessage message(String type, String sessionField, String sessionId, String valueField, String value) {

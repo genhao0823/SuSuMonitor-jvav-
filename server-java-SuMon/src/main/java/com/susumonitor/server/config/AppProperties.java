@@ -1,5 +1,6 @@
 package com.susumonitor.server.config;
 
+import com.susumonitor.server.websocket.TerminalProtocolValidator;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Max;
@@ -439,6 +440,15 @@ public class AppProperties {
         @Min(value = 1, message = "Terminal close burst must be at least one")
         @Max(value = 10000, message = "Terminal close burst must not exceed 10000")
         private int closeBurst = 10;
+        // 输出速率必须为正数，避免令牌桶永远无法为 Agent 输出补充容量。
+        @Positive(message = "Terminal output rate must be greater than zero")
+        private int outputRateBytesPerSecond = 256 * 1024;
+        // 输出突发容量必须为正数，避免新会话无法接收第一段 Agent 输出。
+        @Positive(message = "Terminal output burst must be greater than zero")
+        // 输出突发容量至少容纳协议允许的单条最大输出，避免合法单帧被配置永久拒绝。
+        @Min(value = TerminalProtocolValidator.MAX_DATA_BYTES,
+                message = "Terminal output burst must be at least the maximum terminal data bytes")
+        private int outputBurstBytes = 512 * 1024;
 
         public int getMaxSessionsPerUser() { return maxSessionsPerUser; }
         public void setMaxSessionsPerUser(int value) { maxSessionsPerUser = value; }
@@ -466,6 +476,10 @@ public class AppProperties {
         public void setCloseRatePerMinute(int value) { closeRatePerMinute = value; }
         public int getCloseBurst() { return closeBurst; }
         public void setCloseBurst(int value) { closeBurst = value; }
+        public int getOutputRateBytesPerSecond() { return outputRateBytesPerSecond; }
+        public void setOutputRateBytesPerSecond(int value) { outputRateBytesPerSecond = value; }
+        public int getOutputBurstBytes() { return outputBurstBytes; }
+        public void setOutputBurstBytes(int value) { outputBurstBytes = value; }
     }
 
     /**

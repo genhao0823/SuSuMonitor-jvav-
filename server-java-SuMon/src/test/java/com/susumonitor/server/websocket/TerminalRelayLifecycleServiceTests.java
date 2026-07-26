@@ -24,17 +24,19 @@ class TerminalRelayLifecycleServiceTests {
     void closeMonitorSessionsShouldSendCloseAndPersistClosure() throws Exception {
         TerminalSessionService sessions = mock(TerminalSessionService.class);
         AgentConnectionRegistry agents = mock(AgentConnectionRegistry.class);
+        TerminalOutputRateLimiter limiter = mock(TerminalOutputRateLimiter.class);
         TerminalRelayRegistry registry = new TerminalRelayRegistry();
         MonitorWebSocketSession monitor = monitor("monitor-1");
         registry.bind("c4c942a2-8584-433f-8397-6aef8ea79391", 9L, monitor);
         when(agents.sendToServer(eq(9L), any(TextMessage.class))).thenReturn(true);
-        TerminalRelayLifecycleService service = service(sessions, registry, agents);
+        TerminalRelayLifecycleService service = service(sessions, registry, agents, limiter);
 
         service.closeMonitorSessions(monitor);
 
         verify(agents).sendToServer(eq(9L), any(TextMessage.class));
         verify(sessions).closeSession("c4c942a2-8584-433f-8397-6aef8ea79391",
                 TerminalSessionStatus.CLOSED.value(), "monitor_disconnected");
+        verify(limiter).release("c4c942a2-8584-433f-8397-6aef8ea79391");
         org.junit.jupiter.api.Assertions.assertNull(registry.get("c4c942a2-8584-433f-8397-6aef8ea79391"));
     }
 
@@ -43,20 +45,60 @@ class TerminalRelayLifecycleServiceTests {
     void closeAgentSessionsShouldIgnoreReplacedConnection() {
         TerminalSessionService sessions = mock(TerminalSessionService.class);
         AgentConnectionRegistry agents = mock(AgentConnectionRegistry.class);
+        TerminalOutputRateLimiter limiter = mock(TerminalOutputRateLimiter.class);
         TerminalRelayRegistry registry = new TerminalRelayRegistry();
         registry.bind("c4c942a2-8584-433f-8397-6aef8ea79391", 9L, monitor("monitor-1"));
         AgentWebSocketSession oldAgent = agent(9L, "agent-old");
         when(agents.isCurrent(oldAgent)).thenReturn(false);
 
-        service(sessions, registry, agents).closeAgentSessions(oldAgent);
+        service(sessions, registry, agents, limiter).closeAgentSessions(oldAgent);
 
         assertNotNull(registry.get("c4c942a2-8584-433f-8397-6aef8ea79391"));
         org.mockito.Mockito.verifyNoInteractions(sessions);
     }
 
+    /** 当前 Agent 断开应收口关联会话并释放输出限流桶。 */
+    @Test
+    void closeAgentSessionsShouldReleaseOutputBucket() {
+        TerminalSessionService sessions = mock(TerminalSessionService.class);
+        AgentConnectionRegistry agents = mock(AgentConnectionRegistry.class);
+        TerminalOutputRateLimiter limiter = mock(TerminalOutputRateLimiter.class);
+        TerminalRelayRegistry registry = new TerminalRelayRegistry();
+        registry.bind("c4c942a2-8584-433f-8397-6aef8ea79391", 9L, monitor("monitor-1"));
+        AgentWebSocketSession currentAgent = agent(9L, "agent-current");
+        when(agents.isCurrent(currentAgent)).thenReturn(true);
+
+        service(sessions, registry, agents, limiter).closeAgentSessions(currentAgent);
+
+        verify(sessions).closeSession("c4c942a2-8584-433f-8397-6aef8ea79391",
+                TerminalSessionStatus.ERROR.value(), "agent_disconnected");
+        verify(limiter).release("c4c942a2-8584-433f-8397-6aef8ea79391");
+    }
+
+    /** 服务端保护性关闭应通知 Agent，并收口持久化状态、路由绑定和输出桶。 */
+    @Test
+    void closeBindingFromServerShouldSendCloseAndReleaseAllSessionState() throws Exception {
+        String sessionId = "c4c942a2-8584-433f-8397-6aef8ea79391";
+        TerminalSessionService sessions = mock(TerminalSessionService.class);
+        AgentConnectionRegistry agents = mock(AgentConnectionRegistry.class);
+        TerminalOutputRateLimiter limiter = mock(TerminalOutputRateLimiter.class);
+        TerminalRelayRegistry registry = new TerminalRelayRegistry();
+        MonitorWebSocketSession monitor = monitor("monitor-1");
+        registry.bind(sessionId, 9L, monitor);
+        when(agents.sendToServer(eq(9L), any(TextMessage.class))).thenReturn(true);
+
+        service(sessions, registry, agents, limiter).closeBindingFromServer(registry.get(sessionId),
+                TerminalSessionStatus.CLOSED.value(), "output_rate_exceeded");
+
+        verify(agents).sendToServer(eq(9L), any(TextMessage.class));
+        verify(sessions).closeSession(sessionId, TerminalSessionStatus.CLOSED.value(), "output_rate_exceeded");
+        verify(limiter).release(sessionId);
+        org.junit.jupiter.api.Assertions.assertNull(registry.get(sessionId));
+    }
+
     private TerminalRelayLifecycleService service(TerminalSessionService sessions, TerminalRelayRegistry registry,
-            AgentConnectionRegistry agents) {
-        return new TerminalRelayLifecycleService(sessions, registry, agents, new ObjectMapper(), Clock.systemUTC());
+            AgentConnectionRegistry agents, TerminalOutputRateLimiter limiter) {
+        return new TerminalRelayLifecycleService(sessions, registry, agents, limiter, new ObjectMapper(), Clock.systemUTC());
     }
 
     private MonitorWebSocketSession monitor(String id) {

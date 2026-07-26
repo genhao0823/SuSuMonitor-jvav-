@@ -16,14 +16,17 @@ public class TerminalRelayLifecycleService {
     private final TerminalSessionService terminalSessionService;
     private final TerminalRelayRegistry relayRegistry;
     private final AgentConnectionRegistry agentRegistry;
+    private final TerminalOutputRateLimiter outputRateLimiter;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
     public TerminalRelayLifecycleService(TerminalSessionService terminalSessionService, TerminalRelayRegistry relayRegistry,
-            AgentConnectionRegistry agentRegistry, ObjectMapper objectMapper, Clock clock) {
+            AgentConnectionRegistry agentRegistry, TerminalOutputRateLimiter outputRateLimiter, ObjectMapper objectMapper,
+            Clock clock) {
         this.terminalSessionService = terminalSessionService;
         this.relayRegistry = relayRegistry;
         this.agentRegistry = agentRegistry;
+        this.outputRateLimiter = outputRateLimiter;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -32,7 +35,7 @@ public class TerminalRelayLifecycleService {
     public void closeMonitorSessions(MonitorWebSocketSession monitorSession) {
         for (TerminalRelayRegistry.TerminalRelayBinding binding : relayRegistry.removeByMonitorSession(monitorSession)) {
             sendClose(binding);
-            terminalSessionService.closeSession(binding.sessionId(), TerminalSessionStatus.CLOSED.value(), "monitor_disconnected");
+            closeBinding(binding, TerminalSessionStatus.CLOSED.value(), "monitor_disconnected");
         }
     }
 
@@ -42,8 +45,27 @@ public class TerminalRelayLifecycleService {
             return;
         }
         for (TerminalRelayRegistry.TerminalRelayBinding binding : relayRegistry.removeByServerId(agentSession.serverId())) {
-            terminalSessionService.closeSession(binding.sessionId(), TerminalSessionStatus.ERROR.value(), "agent_disconnected");
+            closeBinding(binding, TerminalSessionStatus.ERROR.value(), "agent_disconnected");
         }
+    }
+
+    /**
+     * 以统一顺序收口会话元数据、内存路由与输出令牌桶，供正常关闭和异常关闭复用。
+     *
+     * @param binding 已验证的会话路由绑定
+     * @param status 持久化的终端会话状态
+     * @param reason 持久化的关闭原因
+     */
+    public void closeBinding(TerminalRelayRegistry.TerminalRelayBinding binding, String status, String reason) {
+        relayRegistry.remove(binding.sessionId());
+        outputRateLimiter.release(binding.sessionId());
+        terminalSessionService.closeSession(binding.sessionId(), status, reason);
+    }
+
+    /** 服务端主动关闭 PTY 后统一收口本地会话状态，供输出带宽超额等保护措施调用。 */
+    public void closeBindingFromServer(TerminalRelayRegistry.TerminalRelayBinding binding, String status, String reason) {
+        sendClose(binding);
+        closeBinding(binding, status, reason);
     }
 
     /** 断连清理使用服务端生成的关闭帧，失败后仍必须完成元数据收口。 */

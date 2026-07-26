@@ -126,6 +126,24 @@ class AppPropertiesTests {
         assertFalse(validator.validate(properties).isEmpty());
     }
 
+    /** 验证非正终端输出字节速率不能通过配置校验。 */
+    @Test
+    void nonPositiveTerminalOutputRateShouldFailValidation() {
+        AppProperties properties = properties(VALID_TEST_SECRET, 24);
+        properties.getTerminal().setOutputRateBytesPerSecond(0);
+
+        assertFalse(validator.validate(properties).isEmpty());
+    }
+
+    /** 验证终端输出突发容量必须容纳协议允许的最大单帧。 */
+    @Test
+    void terminalOutputBurstBelowProtocolMaximumShouldFailValidation() {
+        AppProperties properties = properties(VALID_TEST_SECRET, 24);
+        properties.getTerminal().setOutputBurstBytes(16 * 1024 - 1);
+
+        assertFalse(validator.validate(properties).isEmpty());
+    }
+
     /**
      * 创建测试所需的应用配置。
      *

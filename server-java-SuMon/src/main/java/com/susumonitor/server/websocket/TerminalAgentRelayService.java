@@ -16,13 +16,18 @@ import org.springframework.web.socket.TextMessage;
 public class TerminalAgentRelayService {
     private final TerminalSessionService terminalSessionService;
     private final TerminalRelayRegistry relayRegistry;
+    private final TerminalOutputRateLimiter outputRateLimiter;
+    private final TerminalRelayLifecycleService lifecycleService;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
     public TerminalAgentRelayService(TerminalSessionService terminalSessionService, TerminalRelayRegistry relayRegistry,
+            TerminalOutputRateLimiter outputRateLimiter, TerminalRelayLifecycleService lifecycleService,
             ObjectMapper objectMapper, Clock clock) {
         this.terminalSessionService = terminalSessionService;
         this.relayRegistry = relayRegistry;
+        this.outputRateLimiter = outputRateLimiter;
+        this.lifecycleService = lifecycleService;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -42,10 +47,15 @@ public class TerminalAgentRelayService {
         if (binding == null || !binding.serverId().equals(serverId)) {
             throw new BusinessException(ErrorCode.TERMINAL_SESSION_NOT_FOUND);
         }
+        if (TerminalMessageType.TERMINAL_OUTPUT.value().equals(message.type())
+                && !outputRateLimiter.allow(sessionId, message.payload().path("data").textValue())) {
+            lifecycleService.closeBindingFromServer(binding, TerminalSessionStatus.CLOSED.value(), "output_rate_exceeded");
+            return;
+        }
         if (TerminalMessageType.TERMINAL_OPENED.value().equals(message.type())) {
             terminalSessionService.markOpened(sessionId, message.payload().path("shell").asText());
         } else if (TerminalMessageType.TERMINAL_CLOSED.value().equals(message.type())) {
-            terminalSessionService.closeSession(sessionId, TerminalSessionStatus.CLOSED.value(),
+            lifecycleService.closeBinding(binding, TerminalSessionStatus.CLOSED.value(),
                     message.payload().path("reason").asText());
         } else {
             terminalSessionService.touchSession(sessionId);
@@ -55,9 +65,6 @@ public class TerminalAgentRelayService {
                 .set("payload", message.payload()).toString();
         if (!binding.monitorSession().send(new TextMessage(body))) {
             throw new BusinessException(ErrorCode.TERMINAL_SESSION_STATE_CONFLICT);
-        }
-        if (TerminalMessageType.TERMINAL_CLOSED.value().equals(message.type())) {
-            relayRegistry.remove(sessionId);
         }
     }
 }
