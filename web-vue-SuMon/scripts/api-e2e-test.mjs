@@ -247,10 +247,61 @@ async function testAdminPaths() {
   }
 }
 
+// ===== MVP-6 告警模块(无需 admin 也能读) =====
+
+let firstAlertRecordId = null
+
+async function testListAlertRules() {
+  const r = await api('/api/alerts/rules', { token: registeredToken || 'fake' })
+  if (r.status === 200 && r.json?.code === 0) {
+    const items = r.json?.data || []
+    log('INFO', `[/api/alerts/rules] 200 ✅ (${items.length} 条规则)`)
+  } else if (r.status === 40100 || r.status === 40300) {
+    log('INFO', `[/api/alerts/rules] ${r.status} (预期,无 token 或非 admin)`)
+  } else {
+    log('ERROR', `[/api/alerts/rules] ${r.status} ${JSON.stringify(r.json)}`)
+  }
+}
+
+async function testListAlertRecords() {
+  const r = await api(
+    '/api/alerts/records?page=1&page_size=20',
+    { token: registeredToken || 'fake' }
+  )
+  if (r.status === 200 && r.json?.code === 0) {
+    const items = r.json?.data?.items || []
+    log('INFO', `[/api/alerts/records] 200 ✅ (total=${r.json?.data?.total ?? '?'}, items=${items.length})`)
+    if (items.length > 0) {
+      firstAlertRecordId = items[0].id
+      log('INFO', `  └─ 取第 1 条 id=${firstAlertRecordId}`)
+    }
+  } else if (r.status === 40100 || r.status === 40300) {
+    log('INFO', `[/api/alerts/records] ${r.status} (预期,无 token 或非 admin)`)
+  } else {
+    log('ERROR', `[/api/alerts/records] ${r.status} ${JSON.stringify(r.json)}`)
+  }
+}
+
+async function testMarkAlertRecordAsRead() {
+  if (!firstAlertRecordId) {
+    log('WARN', '[/api/alerts/records/{id}/read] 跳过 — 无记录 id')
+    return
+  }
+  const r = await api(
+    `/api/alerts/records/${firstAlertRecordId}/read`,
+    { method: 'PUT', token: registeredToken || 'fake' }
+  )
+  if (r.status === 200 || r.status === 40100 || r.status === 40300 || r.status === 40900) {
+    log('INFO', `[/api/alerts/records/${firstAlertRecordId}/read] ${r.status} (200/40900 预期,40100/40300 无凭据预期)`)
+  } else {
+    log('ERROR', `[/api/alerts/records/${firstAlertRecordId}/read] ${r.status} ${JSON.stringify(r.json)}`)
+  }
+}
+
 // ===== main =====
 
 async function main() {
-  console.log('M2-M5 HTTP API 自动化测试')
+  console.log('M2-M5 + MVP-6 HTTP API 自动化测试')
   console.log('================================')
   console.log(`目标: ${BASE_URL}`)
   console.log('')
@@ -272,6 +323,11 @@ async function main() {
 
   console.log('--- M5 admin(无 admin 凭据,只能测权限拒绝)---')
   await testAdminPaths()
+
+  console.log('--- MVP-6 告警 ---')
+  await testListAlertRules()
+  await testListAlertRecords()
+  await testMarkAlertRecordAsRead()
 
   console.log('')
   console.log('================================')
