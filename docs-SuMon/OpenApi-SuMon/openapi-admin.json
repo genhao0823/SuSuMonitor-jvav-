@@ -1,0 +1,254 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SuSuMonitor Admin API",
+    "description": "Authoritative SuSuMonitor administrator user-review contract for implementation, tests and Apifox import. JSON property names use camelCase matching the auth module.",
+    "version": "0.1.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:18080",
+      "description": "Local development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "admin",
+      "description": "Administrator user-review operations (ROLE_ADMIN only)"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/api/admin/users/pending": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "List pending users",
+        "description": "Returns all users whose reviewStatus is 'pending'. Admin only.",
+        "operationId": "listPendingUsers",
+        "parameters": [
+          {"$ref": "#/components/parameters/XCorrelationId"}
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending user list returned",
+            "headers": {
+              "X-Request-ID": {"$ref": "#/components/headers/XRequestId"},
+              "X-Correlation-ID": {"$ref": "#/components/headers/XCorrelationId"}
+            },
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/PendingUserListResponse"}
+              }
+            }
+          },
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"}
+        }
+      }
+    },
+    "/api/admin/users/{id}/approve": {
+      "put": {
+        "tags": ["admin"],
+        "summary": "Approve a pending user",
+        "description": "Transitions the target user from 'pending' to 'approved'. Returns the updated user snapshot. Admin only.",
+        "operationId": "approveUser",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Target user ID, must be positive.",
+            "schema": {"type": "integer", "format": "int64", "minimum": 1}
+          },
+          {"$ref": "#/components/parameters/XCorrelationId"}
+        ],
+        "responses": {
+          "200": {
+            "description": "User approved",
+            "headers": {
+              "X-Request-ID": {"$ref": "#/components/headers/XRequestId"},
+              "X-Correlation-ID": {"$ref": "#/components/headers/XCorrelationId"}
+            },
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/CurrentUserResponse"}
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/InvalidRequestParameter"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "409": {"$ref": "#/components/responses/ResourceConflict"}
+        }
+      }
+    },
+    "/api/admin/users/{id}/reject": {
+      "put": {
+        "tags": ["admin"],
+        "summary": "Reject a pending user",
+        "description": "Transitions the target user from 'pending' to 'rejected'. Returns the updated user snapshot. Admin only.",
+        "operationId": "rejectUser",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Target user ID, must be positive.",
+            "schema": {"type": "integer", "format": "int64", "minimum": 1}
+          },
+          {"$ref": "#/components/parameters/XCorrelationId"}
+        ],
+        "responses": {
+          "200": {
+            "description": "User rejected",
+            "headers": {
+              "X-Request-ID": {"$ref": "#/components/headers/XRequestId"},
+              "X-Correlation-ID": {"$ref": "#/components/headers/XCorrelationId"}
+            },
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/CurrentUserResponse"}
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/InvalidRequestParameter"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "403": {"$ref": "#/components/responses/Forbidden"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "409": {"$ref": "#/components/responses/ResourceConflict"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+    },
+    "parameters": {
+      "XCorrelationId": {
+        "name": "X-Correlation-ID",
+        "in": "header",
+        "required": false,
+        "description": "Optional client request trace ID. The server generates a UUID when omitted.",
+        "schema": {"type": "string"}
+      }
+    },
+    "headers": {
+      "XRequestId": {
+        "description": "Server-generated UUID request trace ID.",
+        "schema": {"type": "string"}
+      },
+      "XCorrelationId": {
+        "description": "Server-generated UUID correlation ID.",
+        "schema": {"type": "string"}
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing, invalid, or expired JWT (40100)",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"},
+            "example": {"code": 40100, "message": "unauthorized", "data": null}
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Authenticated but not an administrator (40300)",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"},
+            "example": {"code": 40300, "message": "forbidden", "data": null}
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found (40400)",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"},
+            "example": {"code": 40400, "message": "resource not found", "data": null}
+          }
+        }
+      },
+      "ResourceConflict": {
+        "description": "Resource state conflict (40900)",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"},
+            "example": {"code": 40900, "message": "resource conflict", "data": null}
+          }
+        }
+      },
+      "InvalidRequestParameter": {
+        "description": "Invalid request parameter (40002)",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorResponse"},
+            "example": {"code": 40002, "message": "invalid request parameter", "data": null}
+          }
+        }
+      }
+    },
+    "schemas": {
+      "PendingUser": {
+        "type": "object",
+        "required": ["id", "username", "role", "reviewStatus", "createdAt"],
+        "properties": {
+          "id": {"type": "integer", "format": "int64"},
+          "username": {"type": "string"},
+          "role": {"type": "string", "enum": ["admin", "user"]},
+          "reviewStatus": {"type": "string", "enum": ["pending", "approved", "rejected"]},
+          "createdAt": {"type": "string", "format": "date-time"}
+        }
+      },
+      "PendingUserListResponse": {
+        "type": "object",
+        "required": ["code", "message", "data"],
+        "properties": {
+          "code": {"type": "integer", "example": 0},
+          "message": {"type": "string", "example": "success"},
+          "data": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/PendingUser"}
+          }
+        }
+      },
+      "CurrentUser": {
+        "type": "object",
+        "required": ["id", "username", "role", "reviewStatus", "createdAt"],
+        "properties": {
+          "id": {"type": "integer", "format": "int64"},
+          "username": {"type": "string"},
+          "role": {"type": "string", "enum": ["admin", "user"]},
+          "reviewStatus": {"type": "string", "enum": ["pending", "approved", "rejected"]},
+          "reviewedAt": {"type": "string", "format": "date-time", "nullable": true},
+          "createdAt": {"type": "string", "format": "date-time"}
+        }
+      },
+      "CurrentUserResponse": {
+        "type": "object",
+        "required": ["code", "message", "data"],
+        "properties": {
+          "code": {"type": "integer", "example": 0},
+          "message": {"type": "string", "example": "success"},
+          "data": {"$ref": "#/components/schemas/CurrentUser"}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": {"type": "integer"},
+          "message": {"type": "string"},
+          "data": {"nullable": true}
+        }
+      }
+    }
+  }
+}

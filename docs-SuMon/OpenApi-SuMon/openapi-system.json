@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "",
+    "title": "SuSuMonitor System API",
     "description": "Authoritative SuSuMonitor system API contract for implementation, tests and Apifox import.",
     "version": "0.1.0"
   },

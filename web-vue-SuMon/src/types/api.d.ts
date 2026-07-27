@@ -183,3 +183,126 @@ export interface SshTestResult {
   duration_ms: number
   tested_at: string
 }
+
+/* ---------------------------------------------------------------------------
+ * 告警模块(/api/alerts/**)类型,与 openapi-alert.json 严格对齐。
+ * OpenAPI JSON 是唯一事实源;字段变更必须先改 JSON 再同步本文件。
+ * ------------------------------------------------------------------------- */
+
+/**
+ * 告警指标枚举(与 OpenAPI CreateAlertRuleRequest.metric 枚举对齐)。
+ * 后端当前支持 cpu/memory/disk/temperature/load;新增指标需同步 OpenAPI。
+ */
+export type AlertMetric = 'cpu' | 'memory' | 'disk' | 'temperature' | 'load'
+
+/**
+ * 告警比较运算符枚举(与 OpenAPI CreateAlertRuleRequest.operator 枚举对齐)。
+ */
+export type AlertOperator = '>' | '>=' | '<' | '<='
+
+/**
+ * 告警等级枚举(与 OpenAPI AlertRule.level 枚举对齐)。
+ */
+export type AlertLevel = 'warning' | 'critical'
+
+/**
+ * 告警记录状态枚举(与 OpenAPI AlertRecord.status 枚举对齐)。
+ * unread = 未处理;read = 已读;resolved = 已恢复/已解决。
+ */
+export type AlertStatus = 'unread' | 'read' | 'resolved'
+
+/**
+ * 告警规则(与 OpenAPI AlertRule schema 字段一致)。
+ * server_id 为 null 表示全局规则,匹配所有服务器。
+ */
+export interface AlertRule {
+  id: number
+  server_id: number | null
+  metric: AlertMetric | string
+  operator: AlertOperator | string
+  threshold_value: number
+  level: AlertLevel | string
+  enabled: boolean
+  created_by: number | null
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * 告警记录(与 OpenAPI AlertRecord schema 字段一致)。
+ * 后端按 triggered_at DESC 返回;前端按需展示。
+ */
+export interface AlertRecord {
+  id: number
+  rule_id: number | null
+  server_id: number
+  metric: AlertMetric | string
+  current_value: number
+  threshold_value: number
+  level: AlertLevel | string
+  status: AlertStatus
+  message: string | null
+  read_by: number | null
+  read_at: string | null
+  triggered_at: string
+  created_at: string
+}
+
+/**
+ * /ws/monitor alert.push payload 中内嵌的简化告警对象。
+ *
+ * 注意:与完整 AlertRecord 不同,push 不承诺携带 message/read_by/read_at/created_at,
+ * 也不包含外层的 server_id(server_id 在 payload 顶层)。前端不能把 push 当作 REST
+ * 记录直接合入列表,只能用作增量提示;最终展示应以 REST 拉取为准。
+ */
+export interface AlertPushAlert {
+  id: number
+  rule_id: number | null
+  metric: AlertMetric | string
+  current_value: number
+  threshold_value: number
+  level: AlertLevel | string
+  status: AlertStatus
+  triggered_at: string
+}
+
+/**
+ * /ws/monitor alert.push payload 顶层结构(对齐 websocket-protocol.md §Alert Push)。
+ */
+export interface AlertPushPayload {
+  server_id: number
+  alert: AlertPushAlert
+}
+
+/**
+ * 创建告警规则请求体(与 OpenAPI CreateAlertRuleRequest 字段一致)。
+ * server_id 可省略或显式传 null,表示创建全局规则。
+ */
+export interface CreateAlertRuleRequest {
+  server_id?: number | null
+  metric: AlertMetric
+  operator: AlertOperator
+  threshold_value: number
+  level: AlertLevel
+}
+
+/**
+ * 更新告警规则请求体(与 OpenAPI UpdateAlertRuleRequest 字段一致)。
+ * 后端禁止修改 metric/operator/server_id,前端编辑表单也只允许这三个字段。
+ */
+export interface UpdateAlertRuleRequest {
+  threshold_value: number
+  level: AlertLevel
+  enabled: boolean
+}
+
+/**
+ * 告警记录分页查询参数(与 OpenAPI listAlertRecords parameters 对齐)。
+ * status 不传表示全部;传入时必须为 AlertStatus 枚举值。
+ */
+export interface AlertRecordQuery {
+  page?: number
+  page_size?: number
+  server_id?: number
+  status?: AlertStatus
+}
