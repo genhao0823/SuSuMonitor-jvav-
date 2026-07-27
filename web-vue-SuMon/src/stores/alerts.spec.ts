@@ -4,6 +4,8 @@ import { useAlertsStore } from '@/stores/alerts'
 import { useAuthStore } from '@/stores/auth'
 import { useMetricsStore } from '@/stores/metrics'
 import * as alertApi from '@/api/alert'
+import { ApiBusinessError } from '@/api/client'
+import { ErrorCode } from '@/types/error-code'
 import type { AlertRecord, AlertRule } from '@/types/api'
 
 /**
@@ -170,8 +172,61 @@ describe('alerts store', () => {
       threshold_value: 80,
       level: 'warning'
     })
-    expect(created?.id).toBe(99)
+    expect(created.id).toBe(99)
     expect(store.rules.map((r) => r.id)).toEqual([99, 2])
+  })
+
+  it('createRule 失败时重抛 ApiBusinessError 并设置 rulesError', async () => {
+    const store = useAlertsStore()
+    const apiError = new ApiBusinessError(ErrorCode.RESOURCE_CONFLICT, 'rule conflict')
+    vi.spyOn(alertApi, 'createAlertRule').mockRejectedValue(apiError)
+    await expect(
+      store.createRule({
+        metric: 'cpu',
+        operator: '>',
+        threshold_value: 80,
+        level: 'warning'
+      })
+    ).rejects.toBe(apiError)
+    expect(store.rulesError).toBe('rule conflict')
+  })
+
+  it('updateRule 成功后替换列表中旧条目', async () => {
+    const store = useAlertsStore()
+    store.rules = [makeRule({ id: 1, threshold_value: 80 }), makeRule({ id: 2 })]
+    vi.spyOn(alertApi, 'updateAlertRule').mockResolvedValue({
+      code: 0,
+      message: 'success',
+      data: makeRule({ id: 1, threshold_value: 95 })
+    })
+    const updated = await store.updateRule(1, {
+      threshold_value: 95,
+      level: 'critical',
+      enabled: false
+    })
+    expect(updated.threshold_value).toBe(95)
+    expect(store.rules.find((r) => r.id === 1)?.threshold_value).toBe(95)
+    expect(store.rules).toHaveLength(2)
+  })
+
+  it('updateRule 失败时重抛 ApiBusinessError', async () => {
+    const store = useAlertsStore()
+    const apiError = new ApiBusinessError(ErrorCode.RESOURCE_NOT_FOUND, 'rule gone')
+    vi.spyOn(alertApi, 'updateAlertRule').mockRejectedValue(apiError)
+    await expect(
+      store.updateRule(99, { threshold_value: 50, level: 'warning', enabled: true })
+    ).rejects.toBe(apiError)
+    expect(store.rulesError).toBe('rule gone')
+  })
+
+  it('deleteRule 失败时重抛 ApiBusinessError', async () => {
+    const store = useAlertsStore()
+    store.rules = [makeRule({ id: 1 })]
+    const apiError = new ApiBusinessError(ErrorCode.FORBIDDEN, 'no admin')
+    vi.spyOn(alertApi, 'deleteAlertRule').mockRejectedValue(apiError)
+    await expect(store.deleteRule(1)).rejects.toBe(apiError)
+    expect(store.rulesError).toBe('no admin')
+    expect(store.rules).toHaveLength(1)
   })
 
   it('applyAlertPush 命中合法 payload 时计数 +1', () => {

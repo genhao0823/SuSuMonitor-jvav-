@@ -181,4 +181,28 @@ describe('MonitorWebSocket', () => {
     ws.disconnect()
     expect(lastSocket?.sent).toHaveLength(0)
   })
+
+  it('onclose 后 3 秒自动重连:重新申请 ticket + 新 socket', async () => {
+    vi.useFakeTimers()
+    const onConnected = vi.fn()
+    const ws = new MonitorWebSocket(vi.fn(), onConnected)
+    ws.connect(11)
+    await vi.advanceTimersByTimeAsync(0)
+    lastSocket?.emitOpen()
+    expect(ticketApi.issueMonitorTicket).toHaveBeenCalledTimes(1)
+
+    // 服务端关闭 → 触发 onclose → 启动 3 秒重试
+    lastSocket?.emitClose()
+    expect(onConnected).toHaveBeenLastCalledWith(false)
+
+    // 推进 3 秒前不应有任何重连动作
+    await vi.advanceTimersByTimeAsync(2999)
+    expect(ticketApi.issueMonitorTicket).toHaveBeenCalledTimes(1)
+
+    // 推进到 3 秒应触发重连
+    await vi.advanceTimersByTimeAsync(1)
+    expect(ticketApi.issueMonitorTicket).toHaveBeenCalledTimes(2)
+    expect(lastSocket).not.toBeNull()
+    expect(lastSocket?.url).toContain('/ws/monitor')
+  })
 })
