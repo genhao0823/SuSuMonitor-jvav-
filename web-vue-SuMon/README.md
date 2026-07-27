@@ -4,7 +4,7 @@ SuSuMonitor 监控平台的 Web 前端工程，基于 Vue 3 + Vite + Element Plu
 
 ## 当前里程碑
 
-**M2-M6 主页面已实现**：认证、主布局、仪表盘、服务器管理、用户审核和实时指标页面均已接入真实后端。告警页面属于 MVP-6，Web SSH 终端属于 MVP-7，当前尚未实现。
+**M2-M6 主页面已实现**：认证、主布局、仪表盘、服务器管理、用户审核、实时指标页面以及 MVP-6 告警前端（告警记录 + 告警规则）均已接入真实后端。Web SSH 终端属于 MVP-7，当前尚未实现。
 
 详细计划：[`docs-SuMon/Develop-plans/20260720-Web前端详细开发计划.md`](../docs-SuMon/Develop-plans/20260720-Web前端详细开发计划.md)
 当前总览：[`docs-SuMon/Develop-log/20260722-Web前端总览.md`](../docs-SuMon/Develop-log/20260722-Web前端总览.md)
@@ -62,7 +62,9 @@ Vite 已配置代理 `/api → http://localhost:18080`，前端直接以 `/api/*
 
 - `docs-SuMon/OpenApi-SuMon/openapi-system.json`
 - `docs-SuMon/OpenApi-SuMon/openapi-auth.json`
+- `docs-SuMon/OpenApi-SuMon/openapi-admin.json`
 - `docs-SuMon/OpenApi-SuMon/openapi-server.json`
+- `docs-SuMon/OpenApi-SuMon/openapi-alert.json`
 
 
 ## 调试入口
@@ -73,7 +75,7 @@ Vite 已配置代理 `/api → http://localhost:18080`，前端直接以 `/api/*
 
 ## 已知约束
 
-- 实时指标已经接入；告警和 Web SSH 终端尚未实现，也不展示对应空菜单。
+- 实时指标与 MVP-6 告警前端（记录页 + 规则页）已经接入；Web SSH 终端属于 MVP-7，尚未实现。
 - Dashboard 通过现有 health、ready、servers 和 pending users 接口聚合，专用 `/api/dashboard/summary` 后置评估。
 - 服务器总数趋势和 SSH 历史卡仍是明确标注的模拟/占位内容。
 - `package-lock.json` 在执行 `npm install` 后生成，需提交至版本控制。
@@ -105,6 +107,7 @@ npm run dev    # http://127.0.0.1:5173,自动代理 /api → :18080
 | Sprint 1 SSH 测试按钮接真实后端 | ✅ | Sprint 1 |
 | Sprint 2 spark line 接真实历史 | ✅ | Sprint 2 |
 | Sprint 3 Dashboard spark 接真实 + ServerSparkLine 复用 | ✅ | Sprint 3 |
+| MVP-6 告警前端(记录页 + 规则页 + alert.push 消费 + 菜单挂载) | ✅ | Sprint 5-7 |
 | Polish 6 LONG_FILE 阈值调高 + CRLF 兼容 | ✅ | Polish 6 |
 | OpenAPI 结构、引用和 operationId 校验脚本 | ✅ | 自动化 |
 | catch-up 静态审计(audit:catchup,11 条规则 v0.2) | ✅ | 自动化 |
@@ -127,7 +130,7 @@ npm run dev    # http://127.0.0.1:5173,自动代理 /api → :18080
 | `npm run format` | Prettier 格式化 |
 | `npm run openapi:check` | OpenAPI 契约 lint |
 | `npm run audit:catchup` | catch-up 静态审计(11 条规则,扫魔法数字 / 参数名 / API 路径 / 占位密码 / TS any / 残留日志) |
-| `npm run test` | Vitest 单元测试(28 用例,覆盖 stores + utils + composables) |
+| `npm run test` | Vitest 单元测试(62 用例,覆盖 stores + utils + composables + api/services) |
 | `npm run api:e2e` | HTTP API 自动化测试(覆盖 17 路径中的 HTTP 部分) |
 | `npm run ui:e2e` | UI E2E 浏览器自动化(puppeteer-core + 系统 Chrome,17 路径) |
 

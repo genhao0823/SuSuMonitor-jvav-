@@ -78,9 +78,11 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  Bell,
   DataLine,
   Document,
   Monitor,
+  Notification,
   UserFilled
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -90,7 +92,7 @@ import { userRoleLabel } from '@/utils/format'
 interface MenuItem {
   name: string
   label: string
-  icon: 'Monitor' | 'DataLine' | 'Document'
+  icon: 'Monitor' | 'DataLine' | 'Document' | 'Bell' | 'Notification'
   requiresAdmin?: boolean
 }
 
@@ -106,6 +108,8 @@ const sidebarWidth = '220px'
 const allMenus: MenuItem[] = [
   { name: 'dashboard', label: '仪表盘', icon: 'Monitor' },
   { name: 'servers', label: '服务器', icon: 'DataLine' },
+  { name: 'alert-records', label: '告警记录', icon: 'Bell' },
+  { name: 'alert-rules', label: '告警规则', icon: 'Notification', requiresAdmin: true },
   { name: 'admin-users', label: '用户审核', icon: 'Document', requiresAdmin: true }
 ]
 
@@ -118,7 +122,9 @@ const visibleMenus = computed<MenuItem[]>(() =>
 const iconMap: Record<MenuItem['icon'], typeof Monitor> = {
   Monitor,
   DataLine,
-  Document
+  Document,
+  Bell,
+  Notification
 }
 
 const pageTitle = computed<string>(() => {
@@ -139,6 +145,9 @@ const activeRoute = computed<string>(() => {
   }
   if (name === 'admin-users') {
     return 'admin-users'
+  }
+  if (name === 'alert-records' || name === 'alert-rules') {
+    return name
   }
   return name
 })

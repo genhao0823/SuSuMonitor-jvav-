@@ -84,7 +84,7 @@ SuSuMonitor 是一套**前后端 + Agent 全栈**的服务器监控系统,主题
 4. **Java systemd Unit** — 全仓 0 命中。
 5. **完整宝塔 Nginx 站点配置** — 全仓 0 命中。
 6. **数据库备份脚本** — `scripts/` 仅本地开发脚本。
-7. **MVP-6 告警前端** — 后端业务闭环已实现（Commit `7b01a60`，含状态机去重、记录、已读、`alert.push`），前端告警页面未实现。
+7. **MVP-6 告警前端** — 后端业务闭环（Commit `7b01a60`）+ 前端实现（2026-07-27 Sprint 0-7 收口；告警记录页 `/alerts/records`、告警规则页 `/alerts/rules`、菜单挂载、`alert.push` WS 消费）。
 8. **MVP-7 Web SSH 终端（xterm.js + Agent PTY）** — 仅规划。
 9. **MVP-9~14 微服务与分布式** — 仅规划。
 10. **Android App** — `app-kt-SuMon/` 目录为空。
@@ -238,8 +238,8 @@ go build -o susumonitor-agent ./cmd/susumonitor-agent
 
 ## 后续计划
 
-- **后端**:`server-java-SuMon/` 进入下一阶段(SSH 真实实现 + 告警页面)
-- **前端**:Sprint 5+ 视新需求启动(可能的搜索 / 批量审核)
+- **后端**:`server-java-SuMon/` 进入下一阶段（管理员批量审核 / 用户搜索接口，待前端 Sprint 5+ 启动）
+- **前端**:MVP-6 告警前端已闭环；Sprint 5+ 视新需求启动（可能的搜索 / 批量审核 / T4 Web SSH 终端等）
 - **协作**:在 GitHub 上创建 PR / 提 issue
 
 ## 协议 / 工具
