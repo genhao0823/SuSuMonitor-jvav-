@@ -70,27 +70,36 @@ export const useAlertsStore = defineStore('alerts', () => {
   /**
    * 创建告警规则,成功后把后端返回的对象插入本地列表头部。
    *
+   * 设计:失败时**重抛**原始错误(包含后端业务错误码 `ApiBusinessError`),
+   * 让 `AlertRuleDialog` 的 `catch` 分支可以走 `explainError(error)` 映射到精确中文 toast。
+   * `rulesError` 仅作 fallback 文案,留待调用方读取。
+   *
    * @param req 创建请求
-   * @returns 创建后的规则;失败时返回 null
+   * @returns 创建后的规则
+   * @throws 透传 `createAlertRule` 抛出的错误
    */
-  async function createRule(req: CreateAlertRuleRequest): Promise<AlertRule | null> {
+  async function createRule(req: CreateAlertRuleRequest): Promise<AlertRule> {
     try {
       const response = await createAlertRule(req)
       rules.value = [response.data, ...rules.value]
       return response.data
     } catch (reason) {
       rulesError.value = reason instanceof Error ? reason.message : '规则创建失败'
-      return null
+      throw reason
     }
   }
 
   /**
    * 更新告警规则,成功后用后端返回的对象替换列表中的旧条目。
    *
+   * 失败时**重抛**错误,见 {@link createRule} 的设计说明。
+   *
    * @param id 目标规则 ID
    * @param req 更新请求(仅含 threshold_value/level/enabled)
+   * @returns 更新后的规则
+   * @throws 透传 `updateAlertRule` 抛出的错误
    */
-  async function updateRule(id: number, req: UpdateAlertRuleRequest): Promise<AlertRule | null> {
+  async function updateRule(id: number, req: UpdateAlertRuleRequest): Promise<AlertRule> {
     try {
       const response = await updateAlertRule(id, req)
       const index = rules.value.findIndex((rule) => rule.id === id)
@@ -102,14 +111,18 @@ export const useAlertsStore = defineStore('alerts', () => {
       return response.data
     } catch (reason) {
       rulesError.value = reason instanceof Error ? reason.message : '规则更新失败'
-      return null
+      throw reason
     }
   }
 
   /**
    * 软删除告警规则,成功后从本地列表移除。
    *
+   * 失败时**重抛**错误,见 {@link createRule} 的设计说明。
+   *
    * @param id 目标规则 ID
+   * @returns true 表示删除成功
+   * @throws 透传 `deleteAlertRule` 抛出的错误
    */
   async function deleteRule(id: number): Promise<boolean> {
     try {
@@ -118,7 +131,7 @@ export const useAlertsStore = defineStore('alerts', () => {
       return true
     } catch (reason) {
       rulesError.value = reason instanceof Error ? reason.message : '规则删除失败'
-      return false
+      throw reason
     }
   }
 

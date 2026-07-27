@@ -283,29 +283,23 @@ async function handleSubmit(): Promise<void> {
   }
   submitting.value = true
   try {
+    // store 失败时**重抛** ApiBusinessError,直接落入下方 catch + explainError
+    // 此处无需 null 检查,也不显示通用文案
     if (isEdit.value && props.rule !== null) {
-      const ok = await alerts.updateRule(props.rule.id, {
+      await alerts.updateRule(props.rule.id, {
         threshold_value: form.threshold_value,
         level: form.level,
         enabled: form.enabled
       })
-      if (ok === null) {
-        ElMessage.error(alerts.rulesError ?? '规则更新失败')
-        return
-      }
       ElMessage.success('规则已更新')
     } else {
-      const created = await alerts.createRule({
+      await alerts.createRule({
         server_id: serverIdInput.value,
         metric: form.metric,
         operator: form.operator,
         threshold_value: form.threshold_value,
         level: form.level
       })
-      if (created === null) {
-        ElMessage.error(alerts.rulesError ?? '规则创建失败')
-        return
-      }
       ElMessage.success('规则已创建')
     }
     emit('success')

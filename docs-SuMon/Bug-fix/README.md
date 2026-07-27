@@ -11,6 +11,7 @@
 | 2026-07-21 | M4-server-put-existence-check | `PUT /api/servers/{id}` 校验顺序问题(不存在也报参数错) | 中 | 服务器管理 | 代码已修复，真实 HTTP 待验证 |
 | 2026-07-21 | M4-ssh-test-error-code | `POST /api/servers/{id}/ssh/test` 错误码笼统 | 中 | SSH 连接 | ✅ 已修复：50002/50003 已通过 Apifox 真实分类验收（2026-07-25，用例 `397698534`/`397636440`） |
 | 2026-07-21 | M4-server-list-soft-delete | 列表过滤已软删除数据 | 低 | 服务器管理 | 已验证（J3，真实 MySQL/HTTP 通过） |
+| 2026-07-27 | MVP6-alert-rules-mapper-500 | `POST/PUT/DELETE /api/alerts/rules` 返回 500 空响应体 | 高 | 告警规则 Mapper | 代码已修复：`@Param("rule")` 已加 + `AlertRuleMapperMybatisTests` 用 H2 真实走 INSERT/UPDATE/软删通过；`mvn test` + `mvn package` 通过；真实 MySQL + 真实 HTTP 联调待用户复验 |
 
 ## 文档结构
 
