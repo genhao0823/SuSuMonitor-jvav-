@@ -77,6 +77,12 @@ const protectedChildren: RouteRecordRaw[] = [
     name: 'alert-records',
     component: () => import('@/views/AlertRecordsView.vue'),
     meta: { title: '告警记录', requiresAuth: true }
+  },
+  {
+    path: '/alerts/rules',
+    name: 'alert-rules',
+    component: () => import('@/views/AlertRulesView.vue'),
+    meta: { title: '告警规则', requiresAuth: true, requiresAdmin: true }
   }
 ]
 
