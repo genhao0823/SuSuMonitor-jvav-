@@ -63,6 +63,7 @@ susumonitor:
     cleanup-batch-size: ${METRICS_CLEANUP_BATCH_SIZE:1000}
     cleanup-max-batches-per-run: ${METRICS_CLEANUP_MAX_BATCHES_PER_RUN:100}
   terminal:
+    cleanup-cron: ${TERMINAL_CLEANUP_CRON:0 0 * * * ?}
     max-sessions-per-user: ${TERMINAL_MAX_SESSIONS_PER_USER:2}
     max-sessions-per-server: ${TERMINAL_MAX_SESSIONS_PER_SERVER:4}
     max-sessions: ${TERMINAL_MAX_SESSIONS:16}

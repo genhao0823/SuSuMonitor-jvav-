@@ -32,4 +32,13 @@ public interface AlertRuleMapper {
 
     /** 软删除规则，标记 deleted=1 并记录删除时间。 */
     int softDeleteRule(@Param("id") Long id, @Param("deletedAt") LocalDateTime deletedAt);
+
+    /** 查询同签名活跃规则，excludeId 用于更新时排除自身。 */
+    boolean existsActiveRule(
+            @Param("serverId") Long serverId,
+            @Param("metric") String metric,
+            @Param("operator") String operator,
+            @Param("thresholdValue") java.math.BigDecimal thresholdValue,
+            @Param("level") String level,
+            @Param("excludeId") Long excludeId);
 }

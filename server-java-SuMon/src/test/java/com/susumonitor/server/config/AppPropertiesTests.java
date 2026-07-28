@@ -2,6 +2,7 @@ package com.susumonitor.server.config;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -117,7 +118,14 @@ class AppPropertiesTests {
         assertFalse(validator.validate(properties).isEmpty());
     }
 
-    /** 验证终端控制帧每分钟限流配置不允许为零。 */
+    /** 验证终端清理调度配置的默认值。 */
+    @Test
+    void terminalCleanupConfigurationShouldHaveHourlyDefault() {
+        AppProperties properties = properties(VALID_TEST_SECRET, 24);
+
+        assertEquals("0 0 * * * ?", properties.getTerminal().getCleanupCron());
+    }
+
     @Test
     void nonPositiveTerminalInputRateShouldFailValidation() {
         AppProperties properties = properties(VALID_TEST_SECRET, 24);

@@ -407,6 +407,7 @@ public class AppProperties {
         @Min(value = 1, message = "Terminal per-server session limit must be at least one")
         @Max(value = 100, message = "Terminal per-server session limit must not exceed 100")
         private int maxSessionsPerServer = 4;
+        private String cleanupCron = "0 0 * * * ?";
         @Min(value = 1, message = "Terminal global session limit must be at least one")
         @Max(value = 1024, message = "Terminal global session limit must not exceed 1024")
         private int maxSessions = 16;
@@ -462,6 +463,8 @@ public class AppProperties {
         public void setMaxSessionsPerUser(int value) { maxSessionsPerUser = value; }
         public int getMaxSessionsPerServer() { return maxSessionsPerServer; }
         public void setMaxSessionsPerServer(int value) { maxSessionsPerServer = value; }
+        public String getCleanupCron() { return cleanupCron; }
+        public void setCleanupCron(String value) { cleanupCron = value; }
         public int getMaxSessions() { return maxSessions; }
         public void setMaxSessions(int value) { maxSessions = value; }
         public int getIdleTimeoutMinutes() { return idleTimeoutMinutes; }

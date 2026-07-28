@@ -7,6 +7,8 @@ susumonitor:
   ssh:
     allowed-ports: 22,2222
     allowed-cidrs: 127.0.0.1/32,::1/128
+  terminal:
+    cleanup-cron: "0 0 * * * ?"
   cors:
     allowed-origins:
       - http://localhost:5173

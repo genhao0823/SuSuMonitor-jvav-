@@ -46,4 +46,19 @@
         SET deleted = 1, deleted_at = #{deletedAt}
         WHERE id = #{id} AND deleted = 0
     </update>
+    <select id="existsActiveRule" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM alert_rules
+            WHERE deleted = 0
+              AND ((server_id = #{serverId})
+                OR (server_id IS NULL AND #{serverId} IS NULL))
+              AND metric = #{metric}
+              AND operator = #{operator}
+              AND threshold_value = #{thresholdValue}
+              AND level = #{level}
+              <if test="excludeId != null">
+                  AND id &lt;&gt; #{excludeId}
+              </if>
+        )
+    </select>
 </mapper>
