@@ -195,7 +195,7 @@
         :page-size="pageSize"
         :total="totalCount"
         :page-size-options="pageSizeOptions"
-        @update:page="(v: number) => { page = v }"
+        @update:page="onPageChange"
         @update:page-size="onPageSizeChange"
       />
     </el-card>
@@ -251,7 +251,7 @@ const editingServer = ref<Server | null>(null)
 
 function buildQuery(): ServerQuery {
   const q: ServerQuery = {
-    page: 1,
+    page: page.value,
     page_size: pageSize.value,
     sort_by: sortBy.value,
     sort_order: sortOrder.value
@@ -359,6 +359,18 @@ function onSortChange(sort: { prop: string | null; order: 'ascending' | 'descend
 function onPageSizeChange(size: number): void {
   pageSize.value = size
   page.value = 1
+  void reload()
+}
+
+/**
+ * 切换页码:仅刷新 page.value,触发 reload 拉新数据。
+ * buildQuery() 已读 page.value,无需重置其它状态。
+ */
+function onPageChange(nextPage: number): void {
+  if (nextPage === page.value) {
+    return
+  }
+  page.value = nextPage
   void reload()
 }
 
