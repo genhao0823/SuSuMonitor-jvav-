@@ -205,4 +205,62 @@ describe('MonitorWebSocket', () => {
     expect(lastSocket).not.toBeNull()
     expect(lastSocket?.url).toContain('/ws/monitor')
   })
+
+  /* ------------------ MVP-7 T4 扩展点回归 ------------------ */
+
+  it('onSocketReady 在 socket.onopen 后、metrics.subscribe 之前触发,回调拿到 WebSocket 实例', async () => {
+    const onSocketReady = vi.fn()
+    const ws = new MonitorWebSocket(vi.fn(), vi.fn(), undefined, onSocketReady)
+    ws.connect(1)
+    await new Promise((r) => setTimeout(r, 0))
+    lastSocket?.emitOpen()
+    expect(onSocketReady).toHaveBeenCalledOnce()
+    expect(onSocketReady.mock.calls[0]?.[0]).toBe(lastSocket)
+    // metrics.subscribe 仍在 onSocketReady 之后发出(避免终端 open 与 subscribe 竞态)
+    const subscribe = JSON.parse(lastSocket?.sent[0] ?? '{}')
+    expect(subscribe.type).toBe('metrics.subscribe')
+  })
+
+  it('onSocketReady 抛错时不击穿 metrics.subscribe 流程', async () => {
+    const ws = new MonitorWebSocket(vi.fn(), vi.fn(), undefined, () => {
+      throw new Error('terminal init boom')
+    })
+    ws.connect(1)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(() => lastSocket?.emitOpen()).not.toThrow()
+    const subscribe = JSON.parse(lastSocket?.sent[0] ?? '{}')
+    expect(subscribe.type).toBe('metrics.subscribe')
+  })
+
+  it('terminal.* 帧调 onTerminalMessage;未传时不抛错', async () => {
+    const onTerminalMessage = vi.fn()
+    const ws = new MonitorWebSocket(
+      vi.fn(),
+      vi.fn(),
+      undefined,
+      undefined,
+      onTerminalMessage
+    )
+    ws.connect(1)
+    await new Promise((r) => setTimeout(r, 0))
+    lastSocket?.emitOpen()
+    lastSocket?.emitMessage({
+      type: 'terminal.opened',
+      payload: { server_id: 1, session_id: 'sess-1', shell: '/bin/bash' }
+    })
+    expect(onTerminalMessage).toHaveBeenCalledOnce()
+    expect(onTerminalMessage.mock.calls[0]?.[0].type).toBe('terminal.opened')
+
+    // 不传 onTerminalMessage:不应击穿
+    const noTerm = new MonitorWebSocket(vi.fn(), vi.fn())
+    noTerm.connect(1)
+    await new Promise((r) => setTimeout(r, 0))
+    lastSocket?.emitOpen()
+    expect(() =>
+      lastSocket?.emitMessage({
+        type: 'terminal.output',
+        payload: { server_id: 1, session_id: 'sess-1', data: 'aGVsbG8=' }
+      })
+    ).not.toThrow()
+  })
 })
