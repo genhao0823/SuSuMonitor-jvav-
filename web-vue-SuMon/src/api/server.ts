@@ -1,11 +1,13 @@
 import apiClient from '@/api/client'
 import type {
   ApiResponse,
+  ConfirmSshHostKeyRequest,
   CreateServerRequest,
   PageResult,
   Server,
   ServerQuery,
   ServerStatus,
+  SshHostKey,
   SshTestResult,
   UpdateServerRequest
 } from '@/types/api'
@@ -87,5 +89,24 @@ export function deleteServer(id: number): Promise<ApiResponse<null>> {
 export function testSshConnection(id: number): Promise<ApiResponse<SshTestResult>> {
   return apiClient
     .post<ApiResponse<SshTestResult>>(`/servers/${id}/ssh/test`)
+    .then((r) => r.data)
+}
+
+/**
+ * 首次确认或显式轮换服务器 SSH 主机公钥指纹(OpenAPI confirmServerSshHostKey)。
+ *
+ * 后端只做目标解析与 SSH 握手指纹比对,不发送任何登录凭据。
+ * replace 仅在管理员通过可信带外渠道验证新指纹后置 true,用于显式覆盖已登记指纹。
+ *
+ * @param id 服务器 ID
+ * @param body 期望指纹 + 是否显式轮换
+ * @returns 登记结果,包含算法、指纹、本次操作类型(confirmed/rotated/unchanged)和验证时间
+ */
+export function confirmSshHostKey(
+  id: number,
+  body: ConfirmSshHostKeyRequest
+): Promise<ApiResponse<SshHostKey>> {
+  return apiClient
+    .put<ApiResponse<SshHostKey>>(`/servers/${id}/ssh/host-key`, body)
     .then((r) => r.data)
 }

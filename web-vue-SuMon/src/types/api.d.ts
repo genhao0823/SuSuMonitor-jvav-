@@ -306,3 +306,41 @@ export interface AlertRecordQuery {
   server_id?: number
   status?: AlertStatus
 }
+
+/* ---------------------------------------------------------------------------
+ * SSH 主机指纹 + Agent Token(/api/servers/{id}/ssh/host-key 与
+ * /api/servers/{id}/agent/{register,rotate,revoke})类型。
+ * OpenAPI JSON 是唯一事实源;字段变更必须先改 JSON 再同步本文件。
+ * ------------------------------------------------------------------------- */
+
+/**
+ * SSH 主机公钥确认结果(与 OpenAPI SshHostKeyResult schema 字段一致)。
+ * operation 区分首次确认、显式轮换与幂等复核。
+ */
+export interface SshHostKey {
+  server_id: number
+  host_key_algorithm: string
+  host_key_fingerprint: string
+  operation: 'confirmed' | 'rotated' | 'unchanged'
+  verified_at: string
+}
+
+/**
+ * 主机指纹确认 / 轮换请求体(与 OpenAPI ConfirmSshHostKeyRequest 对齐)。
+ * replace 默认 false;管理员仅在已验证带外新指纹后置 true。
+ */
+export interface ConfirmSshHostKeyRequest {
+  expected_fingerprint: string
+  replace?: boolean
+}
+
+/**
+ * Agent Token 一次性返回值(与 OpenAPI AgentTokenResult schema 字段一致)。
+ * agent_token 仅在 register / rotate 成功响应中出现一次;revoke 返回 null data。
+ * 前端不得把 agent_token 写入 store / localStorage / 日志。
+ */
+export interface AgentToken {
+  server_id: number
+  agent_token: string
+  created_at: string
+}
