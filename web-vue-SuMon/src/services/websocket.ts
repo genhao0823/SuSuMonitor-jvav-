@@ -23,6 +23,7 @@ interface MonitorMessage {
  * 消息类型处理:
  * - `metrics.update` -> `onMetrics(metrics)`
  * - `alert.push`     -> `onAlertPush(payload)`(可选,仅告警页传入)
+ * - `terminal.*`     -> `onTerminalMessage(frame)`(可选,仅终端页传入)
  * - 其他/非法       -> 忽略
  */
 export class MonitorWebSocket {
@@ -39,7 +40,18 @@ export class MonitorWebSocket {
      * AlertRecordsView 传入后,收到 `alert.push` 帧时通过 `isAlertPush` 守卫
      * 校验 payload 形态再回调。
      */
-    private readonly onAlertPush?: (payload: AlertPushPayload) => void
+    private readonly onAlertPush?: (payload: AlertPushPayload) => void,
+    /**
+     * 可选 socket 就绪回调(MVP-7 T4 终端复用 channel 用)。
+     * 在 socket.onopen 触发后、metrics.subscribe 之前调用,TerminalWebSocket 可在
+     * 此处建链并缓存对 socket 的引用。
+     */
+    private readonly onSocketReady?: (socket: WebSocket) => void,
+    /**
+     * 可选终端消息回调。TerminalView 传入后,任何 `terminal.*` 帧(含 opened/output/closed/error)
+     * 都会原样转发;TerminalWebSocket 自行做 payload 校验与回调分派。
+     */
+    private readonly onTerminalMessage?: (frame: MonitorMessage) => void
   ) {}
 
   /**
@@ -104,6 +116,14 @@ export class MonitorWebSocket {
     this.socket = new WebSocket(`${protocol}//${window.location.host}/ws/monitor?ticket=${encodeURIComponent(ticket)}`)
     this.socket.onopen = () => {
       this.onConnected(true)
+      // 让订阅者(终端)先于 metrics.subscribe 拿到 socket,避免竞态
+      if (this.onSocketReady !== undefined && this.socket !== null) {
+        try {
+          this.onSocketReady(this.socket)
+        } catch {
+          // 订阅者抛错不影响主流程
+        }
+      }
       this.socket?.send(JSON.stringify({
         type: 'metrics.subscribe',
         message_id: crypto.randomUUID(),
@@ -126,6 +146,12 @@ export class MonitorWebSocket {
       if (message.type === 'alert.push' && this.onAlertPush !== undefined) {
         if (isAlertPush(message.payload)) {
           this.onAlertPush(message.payload)
+        }
+        return
+      }
+      if (typeof message.type === 'string' && message.type.startsWith('terminal.')) {
+        if (this.onTerminalMessage !== undefined) {
+          this.onTerminalMessage(message)
         }
       }
     }

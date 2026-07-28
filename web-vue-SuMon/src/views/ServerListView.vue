@@ -163,6 +163,15 @@
             >
               测试连接
             </el-button>
+            <el-button
+              v-if="auth.isApproved"
+              size="small"
+              plain
+              type="primary"
+              @click="handleOpenTerminal(row as Server)"
+            >
+              打开终端
+            </el-button>
             <el-popconfirm
               v-if="auth.isAdmin"
               :title="`确定要删除 ${(row as Server).name} 吗?`"
@@ -381,6 +390,11 @@ function openEdit(row: Server): void {
 
 function goDetail(row: Server): void {
   void router.push({ name: 'server-detail', params: { serverId: row.id } })
+}
+
+/** 打开 Web 终端视图(MVP-7 T4)。仅 approved 用户显示按钮,后端再次校验权限。 */
+function handleOpenTerminal(row: Server): void {
+  void router.push({ name: 'terminal', params: { serverId: row.id } })
 }
 
 function handleTestConnection(row: Server): void {

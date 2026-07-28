@@ -40,6 +40,16 @@
         >
           实时监控
         </el-button>
+        <el-button
+          v-if="auth.isApproved"
+          type="warning"
+          plain
+          :disabled="!data"
+          class="server-detail-view__terminal"
+          @click="openTerminal"
+        >
+          Web 终端
+        </el-button>
         <el-popconfirm
           :title="data ? `确定要删除 ${data.name} 吗?` : '确定要删除吗?'"
           confirm-button-text="删除"
@@ -240,11 +250,13 @@ import TushanFoxMark from '@/components/TushanFoxMark.vue'
 import { ApiBusinessError } from '@/api/client'
 import { deleteServer, getServer, getServerStatus, testSshConnection } from '@/api/server'
 import { ErrorCode } from '@/types/error-code'
+import { useAuthStore } from '@/stores/auth'
 import type { Server, ServerStatus, SshTestResult } from '@/types/api'
 import { formatDateTime, serverStatusLabel } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
 const loading = ref(false)
 const data = ref<Server | null>(null)
@@ -305,6 +317,12 @@ function openEdit(): void {
 function goMetrics(): void {
   if (data.value === null) return
   void router.push({ name: 'server-metrics', params: { serverId: data.value.id } })
+}
+
+/** 打开 Web 终端(MVP-7 T4)。按钮已在 approved 权限下显示,后端再校验。 */
+function openTerminal(): void {
+  if (data.value === null) return
+  void router.push({ name: 'terminal', params: { serverId: data.value.id } })
 }
 
 function handleTestConnection(): void {
