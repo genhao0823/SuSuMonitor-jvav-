@@ -13,11 +13,27 @@
           {{ phaseLabel }}
         </el-tag>
         <el-button
-          v-if="canRetry"
+          v-if="phase === 'open'"
+          size="small"
+          type="danger"
+          plain
+          @click="handleDisconnect"
+        >
+          断开
+        </el-button>
+        <el-button
+          v-else-if="canRetry"
           size="small"
           @click="retry"
         >
           重试
+        </el-button>
+        <el-button
+          v-else-if="phase === 'closed'"
+          size="small"
+          @click="retry"
+        >
+          重连
         </el-button>
       </template>
     </PageHeader>
@@ -274,6 +290,18 @@ function retry(): void {
     monitorWs = null
   }
   buildMonitorSocket()
+}
+
+/**
+ * 用户主动断开当前 PTY 会话。
+ * - 调 terminalWs.close() 发 terminal.close 帧给 Java,Java 会转给 Agent 关闭 PTY
+ * - monitorWs 不立即关,等 socket.onclose 自然触发 onConnected(false),phase 进入 closed
+ *   后用户可点"重连"或"重试"重建会话
+ */
+function handleDisconnect(): void {
+  if (terminalWs === null) return
+  terminalWs.close()
+  term.value?.writeln('\r\n\x1b[33m[disconnect] 正在关闭会话...\x1b[0m')
 }
 
 onMounted(async () => {
