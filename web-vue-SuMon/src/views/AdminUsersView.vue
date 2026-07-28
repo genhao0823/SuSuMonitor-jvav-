@@ -65,14 +65,20 @@
         >
           {{ pendingList.length }} 人
         </el-tag>
+        <el-input
+          v-model="searchKeyword"
+          placeholder="按用户名过滤"
+          clearable
+          class="admin-users-view__search"
+        />
       </div>
 
       <el-table
         v-loading="loading"
-        :data="pendingList"
+        :data="filteredPendingList"
         stripe
         class="admin-users-view__table"
-        empty-text="暂无待审核用户,所有申请已处理完毕"
+        :empty-text="searchKeyword.length > 0 ? '无匹配用户' : '暂无待审核用户,所有申请已处理完毕'"
       >
         <el-table-column
           prop="id"
@@ -136,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
 import { ApiBusinessError } from '@/api/client'
@@ -155,6 +161,24 @@ const busyId = ref<number | null>(null)
 const busyAction = ref<'approve' | 'reject' | null>(null)
 
 const pendingList = ref<CurrentUser[]>([])
+
+/**
+ * 用户名本地过滤关键字。后端暂无 /api/admin/users/search 端点,
+ * 此处纯前端 filter;待后端搜索接口就绪后可平滑替换为远端搜索。
+ */
+const searchKeyword = ref('')
+
+/**
+ * 按 searchKeyword 过滤后的待审核列表。
+ * 不区分大小写,trim 关键字;空关键字返回原列表(避免无谓过滤)。
+ */
+const filteredPendingList = computed<CurrentUser[]>(() => {
+  const keyword = searchKeyword.value.trim().toLowerCase()
+  if (keyword.length === 0) {
+    return pendingList.value
+  }
+  return pendingList.value.filter((u) => u.username.toLowerCase().includes(keyword))
+})
 
 /**
  * 拉取待审核列表。
@@ -276,6 +300,11 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   margin-bottom: 16px;
+}
+
+.admin-users-view__search {
+  max-width: 280px;
+  margin-left: auto;
 }
 
 .admin-users-view__summary-label {
