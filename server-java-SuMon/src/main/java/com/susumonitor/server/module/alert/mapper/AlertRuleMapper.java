@@ -15,7 +15,7 @@ import org.apache.ibatis.annotations.Param;
 public interface AlertRuleMapper {
 
     /** 插入新规则。 */
-    int insertRule(AlertRuleEntity rule);
+    int insertRule(@Param("rule") AlertRuleEntity rule);
 
     /** 根据主键查询单条未删除规则。 */
     AlertRuleEntity selectActiveRuleById(@Param("id") Long id);
