@@ -1,11 +1,11 @@
 <template>
   <div class="server-search-bar">
     <el-input
-      :model-value="nameValue"
+      v-model="nameValue"
       placeholder="按名称搜索"
       clearable
       class="server-search-bar__input"
-      @update:model-value="(v: string) => emit('update:nameValue', v ?? '')"
+      @keyup.enter="emit('reload')"
     >
       <template #prefix>
         <svg
@@ -32,11 +32,11 @@
       </template>
     </el-input>
     <el-input
-      :model-value="hostValue"
+      v-model="hostValue"
       placeholder="按主机地址搜索"
       clearable
       class="server-search-bar__input"
-      @update:model-value="(v: string) => emit('update:hostValue', v ?? '')"
+      @keyup.enter="emit('reload')"
     >
       <template #prefix>
         <svg
@@ -63,9 +63,9 @@
       </template>
     </el-input>
     <el-select
-      :model-value="pageSize"
+      v-model="pageSize"
       class="server-search-bar__page-size"
-      @change="(v: number) => emit('update:pageSize', v)"
+      @change="emit('reload')"
     >
       <el-option
         v-for="opt in pageSizeOptions"
@@ -84,27 +84,24 @@
 /**
  * ServerListView 工具条:名称搜索 + 主机搜索 + 每页大小 + 刷新。
  *
- * @prop nameValue 名称搜索值
- * @prop hostValue 主机搜索值
- * @prop pageSize 每页大小
- * @prop pageSizeOptions 每页大小选项
- * @event update:nameValue 名称变化
- * @event update:hostValue 主机变化
- * @event update:pageSize 每页变化
- * @event reload 点击刷新
+ * 通过 `defineModel` 暴露三个 v-model 字段,父组件可双向绑定;
+ * `reload` 事件保留为手动强制刷新与回车触发统一入口。
+ *
+ * @model nameValue 名称搜索字符串
+ * @model hostValue 主机地址搜索字符串
+ * @model pageSize 每页大小(必填)
+ * @prop pageSizeOptions 每页大小选项(必填)
+ * @event reload 点击刷新或回车 / 切换每页大小时触发
  */
+const nameValue = defineModel<string>('nameValue', { default: '' })
+const hostValue = defineModel<string>('hostValue', { default: '' })
+const pageSize = defineModel<number>('pageSize', { required: true })
 
 defineProps<{
-  nameValue: string
-  hostValue: string
-  pageSize: number
   pageSizeOptions: number[]
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:nameValue', value: string): void
-  (e: 'update:hostValue', value: string): void
-  (e: 'update:pageSize', value: number): void
   (e: 'reload'): void
 }>()
 </script>

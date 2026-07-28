@@ -34,14 +34,11 @@
       shadow="never"
     >
       <ServerSearchBar
-        :name-value="searchName"
-        :host-value="searchHost"
-        :page-size="pageSize"
+        v-model:name-value="searchName"
+        v-model:host-value="searchHost"
+        v-model:page-size="pageSize"
         :page-size-options="pageSizeOptions"
-        @update:name-value="(v: string) => { searchName = v }"
-        @update:host-value="(v: string) => { searchHost = v }"
-        @update:page-size="onPageSizeChange"
-        @reload="reload"
+        @reload="onReload"
       />
 
       <el-table
@@ -212,8 +209,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
 import ServerFormDialog from '@/components/ServerFormDialog.vue'
@@ -224,6 +221,7 @@ import { ApiBusinessError } from '@/api/client'
 import { deleteServer, listServers, testSshConnection as testSsh } from '@/api/server'
 import { getMetricsHistory } from '@/api/metrics'
 import { useAuthStore } from '@/stores/auth'
+import { useDebouncedRef } from '@/composables/useDebouncedRef'
 import { ErrorCode } from '@/types/error-code'
 import type { Server, ServerQuery, SshTestResult } from '@/types/api'
 import { formatDateTime, serverStatusLabel } from '@/utils/format'
@@ -231,6 +229,7 @@ import { formatDateTime, serverStatusLabel } from '@/utils/format'
 const auth = useAuthStore()
 
 const router = useRouter()
+const route = useRoute()
 
 const loading = ref(false)
 const serverItems = ref<Server[]>([])
@@ -238,8 +237,12 @@ const serverItems = ref<Server[]>([])
 const page = ref(1)
 const pageSizeOptions: number[] = [10, 20, 50]
 const pageSize = ref<number>(pageSizeOptions[0])
-const searchName = ref('')
-const searchHost = ref('')
+/**
+ * 搜索关键字使用 useDebouncedRef,500ms 内连续输入只触发最后一次 reload。
+ * 直接绑到 ServerSearchBar 的 v-model,无需再写中间 emit 监听。
+ */
+const searchName = useDebouncedRef<string>('', 500)
+const searchHost = useDebouncedRef<string>('', 500)
 const sortBy = ref<ServerQuery['sort_by']>('id')
 const sortOrder = ref<ServerQuery['sort_order']>('desc')
 
@@ -282,8 +285,61 @@ async function reload(): Promise<void> {
     await fetchList()
     // spark line 异步拉取,失败不影响列表展示
     void loadAllSparkHistories()
+    syncQueryToUrl()
   } catch (error) {
     ElMessage.error(explainError(error))
+  }
+}
+
+/**
+ * 工具条"刷新" / 回车 / 切换 pageSize 的统一入口:
+ * 始终重置 page=1 再 reload,避免新关键字被旧 page 切片跳过。
+ */
+function onReload(): void {
+  page.value = 1
+  void reload()
+}
+
+/**
+ * 把当前筛选条件同步到 URL query(供 F5 / 分享链接恢复)。
+ * 排除默认值,保持 URL 干净;router.replace 不留历史。
+ */
+function syncQueryToUrl(): void {
+  const q: Record<string, string> = {}
+  const name = searchName.value.trim()
+  const host = searchHost.value.trim()
+  if (name.length > 0) q.name = name
+  if (host.length > 0) q.host = host
+  if (page.value !== 1) q.page = String(page.value)
+  if (pageSize.value !== pageSizeOptions[0]) q.page_size = String(pageSize.value)
+  if (sortBy.value !== 'id') q.sort_by = String(sortBy.value)
+  if (sortOrder.value !== 'desc') q.sort_order = String(sortOrder.value)
+  void router.replace({ name: 'servers', query: q })
+}
+
+/**
+ * 从 URL query 恢复筛选条件。仅在 onMounted 调用一次,避免双触发 reload。
+ */
+function restoreQueryFromUrl(): void {
+  const q = route.query
+  if (typeof q.name === 'string') searchName.value = q.name
+  if (typeof q.host === 'string') searchHost.value = q.host
+  if (typeof q.page === 'string') {
+    const n = Number.parseInt(q.page, 10)
+    if (!Number.isNaN(n) && n >= 1) page.value = n
+  }
+  if (typeof q.page_size === 'string') {
+    const n = Number.parseInt(q.page_size, 10)
+    if (pageSizeOptions.includes(n)) pageSize.value = n
+  }
+  if (typeof q.sort_by === 'string') {
+    const allowed = ['id', 'name', 'host', 'created_at', 'updated_at'] as const
+    if ((allowed as readonly string[]).includes(q.sort_by)) {
+      sortBy.value = q.sort_by as ServerQuery['sort_by']
+    }
+  }
+  if (q.sort_order === 'asc' || q.sort_order === 'desc') {
+    sortOrder.value = q.sort_order
   }
 }
 
@@ -303,6 +359,7 @@ function onSortChange(sort: { prop: string | null; order: 'ascending' | 'descend
 function onPageSizeChange(size: number): void {
   pageSize.value = size
   page.value = 1
+  void reload()
 }
 
 /**
@@ -447,7 +504,29 @@ function explainError(error: unknown): string {
   return '网络异常,请稍后重试'
 }
 
+/** 抑制 watch 触发标志;restoreQueryFromUrl 写 searchName 时置 true,绕开 watch */
+let suppressWatch = true
+
+/** 首次加载完成的标志位,避免 watch 误触双跑 reload */
+const initialized = ref(false)
+
 onMounted(() => {
+  // 先从 URL 恢复筛选条件(供 F5 / 分享链接恢复),再 reload
+  restoreQueryFromUrl()
+  suppressWatch = false
+  void reload().finally(() => {
+    initialized.value = true
+  })
+})
+
+/**
+ * 监听 debounced 搜索关键字:输入停顿 500ms 后自动重拉列表,
+ * 同时重置 page=1。useDebouncedRef 已合并连续写入,这里只看最终值。
+ * 仅在 initialized=true 后触发,跳过 onMounted 的首次 reload。
+ */
+watch([searchName, searchHost], () => {
+  if (suppressWatch || !initialized.value) return
+  page.value = 1
   void reload()
 })
 </script>
