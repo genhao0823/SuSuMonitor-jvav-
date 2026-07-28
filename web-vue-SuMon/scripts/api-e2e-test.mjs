@@ -298,6 +298,84 @@ async function testMarkAlertRecordAsRead() {
   }
 }
 
+// ===== B-038 补齐端点(SSH host-key + Agent Token)=====
+
+// 用一个无效但符合 OpenAPI 正则的 fingerprint,避免真实主机依赖。
+const PLACEHOLDER_FINGERPRINT = 'SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+
+async function testConfirmSshHostKey() {
+  if (!createdServerId) {
+    log('WARN', '[/api/servers/{id}/ssh/host-key] 跳过 — 无 server id')
+    return
+  }
+  const r = await api(`/api/servers/${createdServerId}/ssh/host-key`, {
+    method: 'PUT',
+    token: registeredToken || 'fake',
+    body: JSON.stringify({
+      expected_fingerprint: PLACEHOLDER_FINGERPRINT,
+      replace: false
+    })
+  })
+  // 无 admin / 无凭据 / 服务器不存在 / 真实指纹比对失败 都在预期范围内
+  if ([40100, 40300, 40400, 50200, 50400, 40902].includes(r.status)
+      || (r.status === 200 && r.json?.code === 0)) {
+    log('INFO', `[/api/servers/${createdServerId}/ssh/host-key] ${r.status} (无 admin/无 server/指纹不符预期)`)
+  } else {
+    log('ERROR', `[/api/servers/${createdServerId}/ssh/host-key] ${r.status} ${JSON.stringify(r.json)}`)
+  }
+}
+
+async function testRegisterAgentToken() {
+  if (!createdServerId) {
+    log('WARN', '[/api/servers/{id}/agent/register] 跳过 — 无 server id')
+    return
+  }
+  const r = await api(`/api/servers/${createdServerId}/agent/register`, {
+    method: 'POST',
+    token: registeredToken || 'fake'
+  })
+  if (r.status === 40100 || r.status === 40300 || r.status === 40400 || r.status === 40900
+      || (r.status === 200 && r.json?.code === 0)) {
+    log('INFO', `[/api/servers/${createdServerId}/agent/register] ${r.status} (401/403/404/409 预期)`)
+  } else {
+    log('ERROR', `[/api/servers/${createdServerId}/agent/register] ${r.status} ${JSON.stringify(r.json)}`)
+  }
+}
+
+async function testRotateAgentToken() {
+  if (!createdServerId) {
+    log('WARN', '[/api/servers/{id}/agent/rotate] 跳过 — 无 server id')
+    return
+  }
+  const r = await api(`/api/servers/${createdServerId}/agent/rotate`, {
+    method: 'POST',
+    token: registeredToken || 'fake'
+  })
+  if (r.status === 40100 || r.status === 40300 || r.status === 40400 || r.status === 40900
+      || (r.status === 200 && r.json?.code === 0)) {
+    log('INFO', `[/api/servers/${createdServerId}/agent/rotate] ${r.status} (401/403/404/409 预期)`)
+  } else {
+    log('ERROR', `[/api/servers/${createdServerId}/agent/rotate] ${r.status} ${JSON.stringify(r.json)}`)
+  }
+}
+
+async function testRevokeAgentToken() {
+  if (!createdServerId) {
+    log('WARN', '[/api/servers/{id}/agent/revoke] 跳过 — 无 server id')
+    return
+  }
+  const r = await api(`/api/servers/${createdServerId}/agent/revoke`, {
+    method: 'DELETE',
+    token: registeredToken || 'fake'
+  })
+  if (r.status === 40100 || r.status === 40300 || r.status === 40400 || r.status === 40900
+      || (r.status === 200 && r.json?.code === 0)) {
+    log('INFO', `[/api/servers/${createdServerId}/agent/revoke] ${r.status} (401/403/404/409 预期)`)
+  } else {
+    log('ERROR', `[/api/servers/${createdServerId}/agent/revoke] ${r.status} ${JSON.stringify(r.json)}`)
+  }
+}
+
 // ===== main =====
 
 async function main() {
@@ -328,6 +406,12 @@ async function main() {
   await testListAlertRules()
   await testListAlertRecords()
   await testMarkAlertRecordAsRead()
+
+  console.log('--- B-038 主机指纹 + Agent Token ---')
+  await testConfirmSshHostKey()
+  await testRegisterAgentToken()
+  await testRotateAgentToken()
+  await testRevokeAgentToken()
 
   console.log('')
   console.log('================================')

@@ -50,6 +50,16 @@
         >
           Web 终端
         </el-button>
+        <el-button
+          v-if="auth.isAdmin"
+          type="info"
+          plain
+          :disabled="!data"
+          class="server-detail-view__host-key"
+          @click="openHostKeyDialog"
+        >
+          主机指纹确认
+        </el-button>
         <el-popconfirm
           :title="data ? `确定要删除 ${data.name} 吗?` : '确定要删除吗?'"
           confirm-button-text="删除"
@@ -232,10 +242,71 @@
       </el-col>
     </el-row>
 
+    <el-card
+      v-if="auth.isAdmin && data"
+      class="server-detail-view__card"
+      shadow="never"
+    >
+      <template #header>
+        <div class="server-detail-view__card-title">
+          <TushanFoxMark
+            :size="28"
+            alt="涂山苏苏·Agent Token 管理"
+          />
+          Agent Token 管理
+        </div>
+      </template>
+      <div class="server-detail-view__agent-actions">
+        <el-button
+          type="primary"
+          plain
+          :disabled="agentBusy"
+          @click="openAgentTokenDialog('register')"
+        >
+          生成 Token
+        </el-button>
+        <el-button
+          type="warning"
+          plain
+          :disabled="agentBusy"
+          @click="openAgentTokenDialog('rotate')"
+        >
+          轮换 Token
+        </el-button>
+        <el-popconfirm
+          title="撤销 Token 后 Agent 将立即断开,确认继续?"
+          confirm-button-text="撤销"
+          cancel-button-text="取消"
+          @confirm="handleRevokeToken"
+        >
+          <template #reference>
+            <el-button
+              type="danger"
+              plain
+              :disabled="agentBusy"
+            >
+              撤销 Token
+            </el-button>
+          </template>
+        </el-popconfirm>
+        <span class="server-detail-view__agent-hint">
+          仅管理员可操作;明文 Token 仅生成 / 轮换响应中出现一次,关闭对话框后无法再查。
+        </span>
+      </div>
+    </el-card>
+
     <ServerFormDialog
       v-model="editOpen"
       :server="data"
       @success="reload"
+    />
+
+    <AgentTokenDialog
+      v-model="agentDialogOpen"
+      :mode="agentDialogMode"
+      :server-id="data?.id ?? 0"
+      :server-name="data?.name"
+      @success="handleAgentTokenSuccess"
     />
   </div>
 </template>
@@ -243,15 +314,17 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
 import ServerFormDialog from '@/components/ServerFormDialog.vue'
+import AgentTokenDialog from '@/components/AgentTokenDialog.vue'
 import TushanFoxMark from '@/components/TushanFoxMark.vue'
 import { ApiBusinessError } from '@/api/client'
-import { deleteServer, getServer, getServerStatus, testSshConnection } from '@/api/server'
+import { confirmSshHostKey, deleteServer, getServer, getServerStatus, testSshConnection } from '@/api/server'
+import { revokeAgentToken } from '@/api/agent-token'
 import { ErrorCode } from '@/types/error-code'
 import { useAuthStore } from '@/stores/auth'
-import type { Server, ServerStatus, SshTestResult } from '@/types/api'
+import type { Server, ServerStatus, SshHostKey, SshTestResult } from '@/types/api'
 import { formatDateTime, serverStatusLabel } from '@/utils/format'
 
 const route = useRoute()
@@ -262,6 +335,9 @@ const loading = ref(false)
 const data = ref<Server | null>(null)
 const status = ref<ServerStatus | null>(null)
 const editOpen = ref(false)
+const agentDialogOpen = ref(false)
+const agentDialogMode = ref<'register' | 'rotate'>('register')
+const agentBusy = ref(false)
 
 /**
  * 解析路由参数 id(只接受数字,非法 id 直接跳回列表)。
@@ -391,6 +467,149 @@ async function handleDelete(): Promise<void> {
     goBack()
   } catch (error) {
     ElMessage.error(explainError(error))
+  }
+}
+
+/**
+ * 打开主机指纹确认流程。
+ *
+ * 使用 ElMessageBox.prompt 输入指纹;replace 复选框采用 ElMessageBox 不可用,
+ * 退化为提示文案引导管理员"轮换请先在新 SSH 会话核验后再次确认"。
+ * 真实带外核对必须由管理员在服务器控制台手动完成,前端无法承担安全责任。
+ */
+async function openHostKeyDialog(): Promise<void> {
+  if (!data.value) {
+    ElMessage.warning('服务器数据未加载')
+    return
+  }
+  let result: { value: string }
+  try {
+    result = await ElMessageBox.prompt(
+      `请输入通过 ssh-keyscan -lf <host> 取得的 OpenSSH SHA-256 指纹。\n格式:SHA256:<Base64 43 字符>\n服务器:${data.value.ssh_host}:${data.value.ssh_port}`,
+      '确认 SSH 主机指纹',
+      {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        inputPattern: /^SHA256:[A-Za-z0-9+/]{43}$/,
+        inputErrorMessage: '指纹格式应为 SHA256:Base43(无填充)'
+      }
+    )
+  } catch {
+    return
+  }
+  const fingerprint = (result.value ?? '').trim()
+  if (fingerprint === '') {
+    return
+  }
+  // 轮换意图:再次确认时若指纹与已登记不一致,前端不强制 require replace=true,
+  // 把"轮换还是首次确认"决策权留给后端 (operation 字段会回传 "confirmed"/"rotated"/"unchanged")。
+  agentBusy.value = true
+  try {
+    const response = await confirmSshHostKey(data.value.id, {
+      expected_fingerprint: fingerprint,
+      replace: false
+    })
+    const resultData: SshHostKey = response.data
+    ElMessage.success(
+      `指纹已${operationLabel(resultData.operation)}(算法 ${resultData.host_key_algorithm})`
+    )
+  } catch (error) {
+    ElMessage.error(explainSshHostKeyError(error))
+  } finally {
+    agentBusy.value = false
+  }
+}
+
+function operationLabel(operation: SshHostKey['operation']): string {
+  if (operation === 'confirmed') return '确认'
+  if (operation === 'rotated') return '轮换'
+  return '复核'
+}
+
+function explainSshHostKeyError(error: unknown): string {
+  if (error instanceof ApiBusinessError) {
+    switch (error.code) {
+      case ErrorCode.SSH_HOST_KEY_MISMATCH:
+        return '指纹与服务器不匹配:请确认带外取得的指纹正确'
+      case ErrorCode.SSH_TARGET_FORBIDDEN:
+        return '目标地址被禁止:仅允许配置的网段'
+      case ErrorCode.SSH_CONNECTION_LIMIT_REACHED:
+        return 'SSH 连接数已达上限,请稍后重试'
+      case ErrorCode.SSH_CONNECTION_FAILED:
+        return 'SSH 连接失败:请检查主机端口与可达性'
+      case ErrorCode.SSH_CONNECTION_TIMEOUT:
+        return 'SSH 连接超时'
+      case ErrorCode.FORBIDDEN:
+        return '无权限:仅管理员可确认主机指纹'
+      case ErrorCode.UNAUTHORIZED:
+        return '未登录或登录已过期'
+      default:
+        return error.message || '操作失败'
+    }
+  }
+  return '网络异常,请稍后重试'
+}
+
+/**
+ * 打开 Agent Token 管理对话框(生成 / 轮换)。
+ *
+ * @param mode register:首次生成;rotate:显式轮换(旧 Token 立即失效)
+ */
+function openAgentTokenDialog(mode: 'register' | 'rotate'): void {
+  if (!data.value) {
+    ElMessage.warning('服务器数据未加载')
+    return
+  }
+  agentDialogMode.value = mode
+  agentDialogOpen.value = true
+}
+
+/**
+ * Agent Token 生成 / 轮换成功后的副作用。
+ *
+ * 当前为最小反馈:toast 已在 dialog 内部触发,父组件只刷新 Agent 状态快照,
+ * 让 agent_status 反映新 Token 的有效性。
+ */
+async function handleAgentTokenSuccess(): Promise<void> {
+  if (!data.value) return
+  try {
+    const statusRes = await getServerStatus(data.value.id)
+    status.value = statusRes.data
+  } catch {
+    // 状态刷新失败不阻断;Agent 上线后再行更新
+  }
+}
+
+async function handleRevokeToken(): Promise<void> {
+  if (!data.value) return
+  agentBusy.value = true
+  try {
+    await revokeAgentToken(data.value.id)
+    ElMessage.success('Token 已撤销,Agent 将立即断开')
+    await reload()
+  } catch (error) {
+    if (error instanceof ApiBusinessError) {
+      switch (error.code) {
+        case ErrorCode.FORBIDDEN:
+          ElMessage.error('无权限:仅管理员可撤销 Token')
+          break
+        case ErrorCode.UNAUTHORIZED:
+          ElMessage.error('未登录或登录已过期')
+          break
+        case ErrorCode.RESOURCE_CONFLICT:
+          ElMessage.error('Token 状态冲突,请刷新后重试')
+          break
+        case ErrorCode.RESOURCE_NOT_FOUND:
+          ElMessage.error('服务器不存在或已被删除')
+          break
+        default:
+          ElMessage.error(error.message || '撤销失败')
+      }
+    } else {
+      ElMessage.error('网络异常,请稍后重试')
+    }
+  } finally {
+    agentBusy.value = false
   }
 }
 
@@ -553,5 +772,20 @@ onMounted(() => {
   text-align: center;
   color: #8a5872;
   font-size: 13px;
+}
+
+.server-detail-view__agent-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.server-detail-view__agent-hint {
+  font-size: 11px;
+  color: #8a5872;
+  font-style: italic;
+  flex: 1 1 100%;
+  margin-top: 4px;
 }
 </style>
