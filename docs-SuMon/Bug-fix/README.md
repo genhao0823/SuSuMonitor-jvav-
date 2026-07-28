@@ -7,7 +7,7 @@
 
 | 日期 | 代号 | 标题 | 优先级 | 模块 | 状态 |
 |---|---|---|---|---|---|
-| 2026-07-21 | M4-server-list-sort-ignored | `GET /api/servers` 排序参数被忽略 | 高 | 服务器管理 | 未修复（前端用客户端排序绕过） |
+| 2026-07-21 | M4-server-list-sort-ignored | `GET /api/servers` 排序参数被忽略 | 高 | 服务器管理 | ✅ 已解决（2026-07-28 Sprint A）：后端 sort_by / sort_order 白名单排序真实 MySQL/HTTP/Apifox 全绿；前端已撤除 `sortedRows` / `pagedRows` 客户端排序 fallback，改为接后端真实分页（`serverItems` + `totalCount`）。 |
 | 2026-07-21 | M4-server-put-existence-check | `PUT /api/servers/{id}` 校验顺序问题(不存在也报参数错) | 中 | 服务器管理 | 代码已修复，真实 HTTP 待验证 |
 | 2026-07-21 | M4-ssh-test-error-code | `POST /api/servers/{id}/ssh/test` 错误码笼统 | 中 | SSH 连接 | ✅ 已修复：50002/50003 已通过 Apifox 真实分类验收（2026-07-25，用例 `397698534`/`397636440`） |
 | 2026-07-21 | M4-server-list-soft-delete | 列表过滤已软删除数据 | 低 | 服务器管理 | 已验证（J3，真实 MySQL/HTTP 通过） |
@@ -33,5 +33,10 @@
 
 ## 排序类说明
 
-`M4-server-list-sort-ignored` 当前用客户端排序(serverItems → sortedRows → pagedRows)绕过,
-后端修好后前端应撤除该方案并恢复"参数 → 后端 → 切片"的简单流程。
+`M4-server-list-sort-ignored` 已解决（2026-07-28 Sprint A）。
+前端已撤除客户端排序 fallback：
+- 删除 `sortedRows` / `pagedRows` computed
+- `:data` 直接绑 `serverItems`
+- `totalCount` 由后端 `data.total` 驱动
+- `onSortChange` 触发 `reload()` 让后端排序
+- `buildQuery()` `page_size` 跟随用户选择（不再硬编码 100）

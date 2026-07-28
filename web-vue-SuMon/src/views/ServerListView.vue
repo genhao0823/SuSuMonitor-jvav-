@@ -46,7 +46,7 @@
 
       <el-table
         v-loading="loading"
-        :data="pagedRows"
+        :data="serverItems"
         stripe
         class="server-list-view__table"
         empty-text="暂无服务器,点击右上角创建"
@@ -212,7 +212,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
@@ -249,7 +249,7 @@ const editingServer = ref<Server | null>(null)
 function buildQuery(): ServerQuery {
   const q: ServerQuery = {
     page: 1,
-    page_size: 100,
+    page_size: pageSize.value,
     sort_by: sortBy.value,
     sort_order: sortOrder.value
   }
@@ -264,43 +264,14 @@ function buildQuery(): ServerQuery {
   return q
 }
 
-const sortedRows = computed<Server[]>(() => {
-  const data = serverItems.value
-  if (data.length === 0) {
-    return data
-  }
-  const prop = sortBy.value
-  const dir = sortOrder.value
-  if (prop === 'id' && dir === 'desc') {
-    return data
-  }
-  const copy = data.slice()
-  copy.sort((a, b) => {
-    const av = (a as unknown as Record<string, unknown>)[prop as string]
-    const bv = (b as unknown as Record<string, unknown>)[prop as string]
-    let cmp = 0
-    if (typeof av === 'number' && typeof bv === 'number') {
-      cmp = av - bv
-    } else {
-      cmp = String(av ?? '').localeCompare(String(bv ?? ''), 'zh-CN')
-    }
-    return dir === 'asc' ? cmp : -cmp
-  })
-  return copy
-})
-
-const pagedRows = computed<Server[]>(() => {
-  const start = (page.value - 1) * pageSize.value
-  return sortedRows.value.slice(start, start + pageSize.value)
-})
-
-const totalCount = computed<number>(() => serverItems.value.length)
+const totalCount = ref<number>(0)
 
 async function fetchList(): Promise<void> {
   loading.value = true
   try {
     const response = await listServers(buildQuery())
     serverItems.value = response.data?.items ?? []
+    totalCount.value = response.data?.total ?? 0
   } finally {
     loading.value = false
   }
@@ -325,6 +296,8 @@ function onSortChange(sort: { prop: string | null; order: 'ascending' | 'descend
     sortOrder.value = sort.order === 'ascending' ? 'asc' : 'desc'
   }
   page.value = 1
+  // 后端排序由 buildQuery() 拼入 sort_by / sort_order,这里直接重拉。
+  void reload()
 }
 
 function onPageSizeChange(size: number): void {
@@ -452,7 +425,7 @@ async function handleDelete(row: Server): Promise<void> {
   try {
     await deleteServer(row.id)
     ElMessage.success(`已删除 ${row.name}`)
-    if (pagedRows.value.length === 1 && page.value > 1) {
+    if (serverItems.value.length === 1 && page.value > 1) {
       page.value -= 1
     }
     await reload()
