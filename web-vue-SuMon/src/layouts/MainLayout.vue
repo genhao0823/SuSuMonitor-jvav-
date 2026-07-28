@@ -13,13 +13,12 @@
         background-color="transparent"
         text-color="#cbd5e1"
         active-text-color="#ffffff"
-        router
+        @select="handleMenuSelect"
       >
         <el-menu-item
           v-for="item in visibleMenus"
           :key="item.name"
           :index="item.name"
-          :route="{ name: item.name }"
         >
           <el-icon>
             <component :is="item.icon" />
@@ -83,17 +82,23 @@ import {
   Document,
   Monitor,
   Notification,
+  Promotion,
   UserFilled
 } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { userRoleLabel } from '@/utils/format'
 
 interface MenuItem {
   name: string
   label: string
-  icon: 'Monitor' | 'DataLine' | 'Document' | 'Bell' | 'Notification'
+  icon: 'Monitor' | 'DataLine' | 'Document' | 'Bell' | 'Notification' | 'Promotion'
   requiresAdmin?: boolean
+  /**
+   * 菜单是否需要选择目标 server 才能跳转(Web 终端依赖 :serverId 形参)。
+   * 为 true 时点击菜单弹 ElDialog 输入 serverId,空值则保留在当前页。
+   */
+  requiresServer?: boolean
 }
 
 const route = useRoute()
@@ -110,7 +115,8 @@ const allMenus: MenuItem[] = [
   { name: 'servers', label: '服务器', icon: 'DataLine' },
   { name: 'alert-records', label: '告警记录', icon: 'Bell' },
   { name: 'alert-rules', label: '告警规则', icon: 'Notification', requiresAdmin: true },
-  { name: 'admin-users', label: '用户审核', icon: 'Document', requiresAdmin: true }
+  { name: 'admin-users', label: '用户审核', icon: 'Document', requiresAdmin: true },
+  { name: 'terminal', label: 'Web 终端', icon: 'Promotion', requiresServer: true }
 ]
 
 const visibleMenus = computed<MenuItem[]>(() =>
@@ -124,7 +130,8 @@ const iconMap: Record<MenuItem['icon'], typeof Monitor> = {
   DataLine,
   Document,
   Bell,
-  Notification
+  Notification,
+  Promotion
 }
 
 const pageTitle = computed<string>(() => {
@@ -149,6 +156,9 @@ const activeRoute = computed<string>(() => {
   if (name === 'alert-records' || name === 'alert-rules') {
     return name
   }
+  if (name === 'terminal') {
+    return 'terminal'
+  }
   return name
 })
 
@@ -162,6 +172,38 @@ async function handleCommand(command: string): Promise<void> {
     await auth.logout()
     ElMessage.success('已退出登录')
     await router.push({ name: 'login' })
+  }
+}
+
+/**
+ * 侧栏菜单点击处理。
+ * - 普通菜单:直接跳到对应命名路由
+ * - requiresServer 菜单(Web 终端):弹 prompt 输入 serverId,合法后跳 `/terminal/:serverId`,
+ *   非法或取消则保留在当前页
+ */
+async function handleMenuSelect(name: string): Promise<void> {
+  const menu = allMenus.find((m) => m.name === name)
+  if (!menu) return
+  if (!menu.requiresServer) {
+    await router.push({ name: menu.name })
+    return
+  }
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '请输入目标服务器 ID(正整数)',
+      '打开 Web 终端',
+      {
+        inputPattern: /^[1-9]\d*$/,
+        inputErrorMessage: '请输入正整数 serverId',
+        confirmButtonText: '打开',
+        cancelButtonText: '取消'
+      }
+    )
+    const serverId = Number.parseInt(value, 10)
+    if (Number.isNaN(serverId) || serverId <= 0) return
+    await router.push({ name: 'terminal', params: { serverId: String(serverId) } })
+  } catch {
+    // 用户取消 prompt:静默保留当前页
   }
 }
 
