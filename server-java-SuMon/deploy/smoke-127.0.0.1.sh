@@ -27,11 +27,11 @@ fail() { printf '[smoke] FAIL: %s\n' "$*" >&2; exit 1; }
 log "verifying IPv4 loopback listener at ${BASE_URL}"
 
 if command -v ss >/dev/null 2>&1; then
-    if ! ss -ltn "sport = :18080" | awk 'NR==1 || /LISTEN/' | grep -q '127\.0\.0\.1:18080'; then
+    if ! ss -ltn "( sport = :18080 )" | grep -Eq '127\.0\.0\.1:18080|\[::ffff:127\.0\.0\.1\]:18080|0\.0\.0\.0:18080|\*:18080|\[::\]:18080'; then
         fail "127.0.0.1:18080 is not listening; start the Java backend first."
     fi
 elif command -v netstat >/dev/null 2>&1; then
-    if ! netstat -ltn 2>/dev/null | grep -q '127.0.0.1:18080'; then
+    if ! netstat -ltn 2>/dev/null | grep -Eq '127\.0\.0\.1:18080|0\.0\.0\.0:18080'; then
         fail "127.0.0.1:18080 is not listening; start the Java backend first."
     fi
 else
