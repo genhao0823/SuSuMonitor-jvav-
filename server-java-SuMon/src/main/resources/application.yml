@@ -66,6 +66,7 @@ susumonitor:
     cleanup-cron: ${TERMINAL_CLEANUP_CRON:0 0 * * * ?}
     max-sessions-per-user: ${TERMINAL_MAX_SESSIONS_PER_USER:2}
     max-sessions-per-server: ${TERMINAL_MAX_SESSIONS_PER_SERVER:4}
+    max-operating-users: ${TERMINAL_MAX_OPERATING_USERS:5}
     max-sessions: ${TERMINAL_MAX_SESSIONS:16}
     idle-timeout-minutes: ${TERMINAL_IDLE_TIMEOUT_MINUTES:20}
     max-session-hours: ${TERMINAL_MAX_SESSION_HOURS:8}

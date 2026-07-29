@@ -14,8 +14,12 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** 实现终端元数据的创建、状态转换和单 JVM 会话额度控制。 */
 @Service
@@ -25,6 +29,8 @@ public class TerminalSessionServiceImpl implements TerminalSessionService {
     private final ServerMapper serverMapper;
     private final AppProperties properties;
     private final Clock clock;
+    private final ReentrantLock globalQuotaLock = new ReentrantLock();
+    private final ConcurrentHashMap<String, ReentrantLock> quotaLocks = new ConcurrentHashMap<>();
 
     public TerminalSessionServiceImpl(TerminalSessionMapper sessionMapper, UserMapper userMapper,
             ServerMapper serverMapper, AppProperties properties, Clock clock) {
@@ -39,6 +45,22 @@ public class TerminalSessionServiceImpl implements TerminalSessionService {
     @Override
     @Transactional
     public TerminalSessionEntity openSession(Long userId, Long serverId, String openMessageId) {
+        ReentrantLock quotaLock = quotaLocks.computeIfAbsent(
+                userId + ":" + serverId, key -> new ReentrantLock());
+        globalQuotaLock.lock();
+        quotaLock.lock();
+        try {
+            registerQuotaUnlock(globalQuotaLock, quotaLock);
+            return openSessionUnderQuotaLock(userId, serverId, openMessageId);
+        } finally {
+            if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+                quotaLock.unlock();
+                globalQuotaLock.unlock();
+            }
+        }
+    }
+
+    private TerminalSessionEntity openSessionUnderQuotaLock(Long userId, Long serverId, String openMessageId) {
         TerminalSessionEntity existing = sessionMapper.selectByUserIdAndOpenMessageId(userId, openMessageId);
         if (existing != null) {
             return existing;
@@ -65,6 +87,19 @@ public class TerminalSessionServiceImpl implements TerminalSessionService {
         session.setLastActivityAt(now);
         sessionMapper.insertSession(session);
         return session;
+    }
+
+    private void registerQuotaUnlock(ReentrantLock globalLock, ReentrantLock quotaLock) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                quotaLock.unlock();
+                globalLock.unlock();
+            }
+        });
     }
 
     /** {@inheritDoc} */
@@ -130,6 +165,7 @@ public class TerminalSessionServiceImpl implements TerminalSessionService {
         int serverCount = sessionMapper.selectActiveByServerId(serverId).size();
         if (userCount >= properties.getTerminal().getMaxSessionsPerUser()
                 || serverCount >= properties.getTerminal().getMaxSessionsPerServer()
+                || sessionMapper.countActiveUsers() >= properties.getTerminal().getMaxOperatingUsers()
                 || sessionMapper.selectAllActive().size() >= properties.getTerminal().getMaxSessions()) {
             throw new BusinessException(ErrorCode.TERMINAL_SESSION_LIMIT_REACHED);
         }
