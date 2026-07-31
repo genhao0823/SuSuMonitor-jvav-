@@ -103,6 +103,22 @@ class AlertRecordStateMapperMybatisTests {
         assertNotNull(state.getId());
     }
 
+    /** 恢复后 DELETE 应删除状态行；版本不匹配时乐观锁防误删，删除后查询为 null。 */
+    @Test
+    void deleteStateShouldRemoveRowWithVersionMatch() {
+        AlertStateMapper mapper;
+        try (SqlSession session = sqlSessionFactory.openSession(true)) {
+            mapper = session.getMapper(AlertStateMapper.class);
+            AlertStateEntity state = newState();
+            assertEquals(1, mapper.insertState(state));
+
+            // 版本不匹配：不删除（乐观锁）。
+            assertEquals(0, mapper.deleteState(state.getId(), 99));
+            assertEquals(1, mapper.deleteState(state.getId(), state.getVersion()));
+            assertEquals(null, mapper.selectByRuleAndServer(1L, 1L));
+        }
+    }
+
     private void parseMapper(Configuration configuration, String resource) throws Exception {
         try (var mapperXml = Resources.getResourceAsReader(resource)) {
             new org.apache.ibatis.builder.xml.XMLMapperBuilder(mapperXml, configuration, resource,

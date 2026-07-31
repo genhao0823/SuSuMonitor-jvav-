@@ -135,13 +135,13 @@ public class AlertEvaluationServiceImpl implements AlertEvaluationService {
     }
 
     /**
-     * 恢复：标记 record resolved + state inactive，不发布事件。
+     * 恢复：标记 record resolved + 删除 state 行（恢复后下次评估 state 为 null，可再次触发）。
      */
     private void handleResolve(AlertStateEntity state) {
         LocalDateTime now = LocalDateTime.now(clock);
         recordMapper.updateStatusToResolved(state.getAlertRecordId(), now);
-        int updated = stateMapper.updateStateResolved(state.getId(), now, state.getVersion());
-        if (updated == 0) {
+        int deleted = stateMapper.deleteState(state.getId(), state.getVersion());
+        if (deleted == 0) {
             log.warn("alert state optimistic lock conflict during resolve, stateId={}, version={}",
                     state.getId(), state.getVersion());
         }

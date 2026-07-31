@@ -24,7 +24,11 @@ public interface AlertStateMapper {
     int updateStateActive(@Param("id") Long id, @Param("alertRecordId") Long alertRecordId,
             @Param("lastTriggeredAt") LocalDateTime lastTriggeredAt, @Param("version") int version);
 
-    /** 更新状态为已恢复，设置 active=0 和 resolved_at，version + 1。 */
-    int updateStateResolved(@Param("id") Long id, @Param("resolvedAt") LocalDateTime resolvedAt,
-            @Param("version") int version);
+    /**
+     * 恢复后删除状态行（乐观锁防误删）。
+     *
+     * <p>状态机约定恢复后的 state 为 null（见 {@code AlertStateMachine} javadoc），
+     * 因此恢复语义是删除行而非置 active=0，否则恢复后再次越界无法重新触发。</p>
+     */
+    int deleteState(@Param("id") Long id, @Param("version") int version);
 }

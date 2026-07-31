@@ -86,7 +86,7 @@ class AlertEvaluationServiceTests {
         verify(eventPublisher, never()).publishEvent(any());
     }
 
-    /** 恢复应标记 record resolved 和 state inactive。 */
+    /** 恢复应标记 record resolved 并删除 state 行（恢复后 state 为 null 才能再次触发）。 */
     @Test
     void recoveryShouldMarkResolved() {
         setupService();
@@ -95,12 +95,12 @@ class AlertEvaluationServiceTests {
         AlertStateEntity state = activeState(1L, 1L, 1L);
         when(ruleMapper.selectEnabledRulesForServer(1L)).thenReturn(List.of(rule));
         when(stateMapper.selectByRuleAndServer(1L, 1L)).thenReturn(state);
-        when(stateMapper.updateStateResolved(anyLong(), any(LocalDateTime.class), eq(0))).thenReturn(1);
+        when(stateMapper.deleteState(eq(1L), eq(0))).thenReturn(1);
 
         service.onMetricsReported(new MetricsReportedEvent(metrics));
 
         verify(recordMapper).updateStatusToResolved(eq(1L), any(LocalDateTime.class));
-        verify(stateMapper).updateStateResolved(eq(1L), any(LocalDateTime.class), eq(0));
+        verify(stateMapper).deleteState(eq(1L), eq(0));
         verify(eventPublisher, never()).publishEvent(any());
     }
 

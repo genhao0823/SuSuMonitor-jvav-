@@ -30,9 +30,8 @@
         SET active = 1, alert_record_id = #{alertRecordId}, last_triggered_at = #{lastTriggeredAt}, version = version + 1
         WHERE id = #{id} AND version = #{version}
     </update>
-    <update id="updateStateResolved">
-        UPDATE alert_states
-        SET active = 0, resolved_at = #{resolvedAt}, version = version + 1
+    <delete id="deleteState">
+        DELETE FROM alert_states
         WHERE id = #{id} AND version = #{version}
-    </update>
+    </delete>
 </mapper>
