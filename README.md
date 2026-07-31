@@ -20,6 +20,9 @@
 > | **计划中** | 仅出现在 plan 文档，未进入开发 |
 > | **outdated** | 文档陈旧但保留作历史快照 |
 >
+> **总体状态（2026-07-31 对齐说明，详见 `docs-SuMon/Develop-log/20260731-MVP9-数据所有权与依赖审计.md`、`20260731-MVP9-契约冻结评审与出口条件核对.md`）**：
+> **MVP-9 收口完成（2026-07-31）**：性能基线 7 场景实测 PASS（`api-test/bench-alert-chain.mjs`，p50/p95/p99 见 `20260728-MVP-9-Java后端性能基线.md` §九~§十）；数据所有权审计完成并收口 3 处跨模块 Mapper 访问（admin/metrics/terminal 改走 Service 契约）；RabbitMQ 消息契约与拓扑完成评审冻结。过程中修复 1 个真实 bug：告警恢复后不再触发（`handleResolve` 改为删除 state 行，commit `f7dba69`，verify-alert-ws 24/24 复核通过）。
+>
 > **总体状态（2026-07-27 对齐说明，详见 `docs-SuMon/Develop-log/20260727-项目状态与契约最终收口.md`）**：
 > 本机闭环（M1-M6 + Sprint 1-4 + Polish 1-6）已实现并本机运行时验证；MVP-6 后端业务闭环已实现（Commit 7b01a60，前端告警页面未实现）；MVP-7 终端 T1-T3 已完成（PTY_RELAY_INTEGRATION_OK 2026-07-26）；真实 SSH `50003`/`50002` 分类已于 2026-07-25 通过 Apifox 验收。仍属“未验证”：首管理员空库并发、公网部署真实链路、多 JVM AFTER_COMMIT 事件跨实例、Agent Linux 二进制真实 WSS、Monitor 1012 真实背压覆盖。
 
