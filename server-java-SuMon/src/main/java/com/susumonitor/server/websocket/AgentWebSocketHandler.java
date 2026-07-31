@@ -182,6 +182,11 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
             if (terminalRelayLifecycleService != null) {
                 terminalRelayLifecycleService.closeAgentSessions(session);
             }
+            // Agent 断开(关机/进程退出)时立即标记服务器离线;
+            // 乐观锁防止误覆盖已重连新连接(markAgentOffline 要求 last_heartbeat_at 匹配)。
+            if (heartbeatService != null) {
+                heartbeatService.markOfflineOnDisconnect(session);
+            }
             connectionRegistry.remove(session);
         }
         if (connectionLimiter != null) {

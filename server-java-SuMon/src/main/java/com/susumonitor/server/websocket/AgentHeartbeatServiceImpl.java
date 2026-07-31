@@ -55,4 +55,16 @@ public class AgentHeartbeatServiceImpl implements AgentHeartbeatService {
             }
         }
     }
+
+    /** Agent 连接断开时标记服务器离线(乐观锁,不覆盖已重连新连接)。 */
+    @Override
+    public void markOfflineOnDisconnect(AgentWebSocketSession session) {
+        if (session == null || !session.authenticated() || session.serverId() == null
+                || session.lastHeartbeatAt() == null) {
+            return;
+        }
+        // 乐观锁:仅当 last_heartbeat_at 仍是断开时的值才设 offline,
+        // 防止误把已重连新连接(新心跳更新了 last_heartbeat_at)设为离线。
+        serverMapper.markAgentOffline(session.serverId(), session.lastHeartbeatAt());
+    }
 }
