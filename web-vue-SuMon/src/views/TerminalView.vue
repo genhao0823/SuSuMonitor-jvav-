@@ -239,6 +239,13 @@ function buildMonitorSocket(): void {
     (socket) => {
       // socket 已 OPEN 且 metrics.subscribe 即将发出,此处建 TerminalWebSocket
       if (term.value === null) return
+      // 重新 fit:mountXterm 初始 fit 时容器可能尚未完成 CSS 布局,cols 会极小(如 2),
+      // socket 就绪时容器已布局,重算确保 terminal.open 携带合理 cols。
+      try {
+        fitAddon.value?.fit()
+      } catch {
+        // 容器未就绪时忽略,沿用初始 cols
+      }
       terminalWs = new TerminalWebSocket({
         socket,
         serverId: serverId.value,
