@@ -162,17 +162,34 @@ deploy/
 
 ### 方式 A：一键安装（推荐）
 
-前置：已 `make build-linux` 产出 `bin/susumonitor-agent-linux-amd64`，将其与 `deploy/` 一起传到目标机：
+云端已托管二进制 + 脚本，目标机一行命令下载部署：
 
 ```bash
-# 目标机执行
-sudo bash install.sh
-# 自动:二进制装 /usr/local/bin/,配置装 /etc/susumonitor/agent.env,日志装 /var/log/susumonitor/
-# 安装后不会自动启动,需先改配置
-sudo vi /etc/susumonitor/agent.env   # 填 BACKEND_URL/SERVER_ID/AGENT_TOKEN
-sudo systemctl daemon-reload
-sudo systemctl enable --now susumonitor-agent
+curl --fail --silent --show-error --location \
+  http://SERVER_IP_OR_DOMAIN/agent/install-agent.sh | \
+  sudo -E env \
+    AGENT_BASE_URL=http://SERVER_IP_OR_DOMAIN \
+    AGENT_ALLOW_INSECURE_HTTP=true \
+    AGENT_VERSION=1.0.0 \
+    bash
 ```
+
+> 临时 IPv4 测试用 `AGENT_ALLOW_INSECURE_HTTP=true`（仅允许授权测试 IP）。生产环境上 HTTPS 后去掉此变量，`AGENT_BASE_URL` 改为 `https://域名`。
+
+脚本自动完成：下载二进制（sha256 校验）→ 交互输入 admin 账密 → 登录 → 预建 server → 发 token → 写配置 → 装 systemd → 启动验证。安装失败自动回滚。
+
+**环境变量**：
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `AGENT_BASE_URL` | `https://monitor.example.com` | 后端地址，生产必须 HTTPS |
+| `AGENT_ALLOW_INSECURE_HTTP` | `false` | 临时明文 HTTP，仅允许授权 IPv4 |
+| `AGENT_VERSION` | `1.0.0` | release 版本号 |
+| `AGENT_NAME` | `hostname -s` | 主机显示名 |
+| `AGENT_SERVER_ID` | 空（新建） | 已有 server 时复用，跳过预建 |
+| `AGENT_TERMINAL_ENABLED` | `false` | 设 `true` 开启 Web 终端 |
+
+> 已有 `/etc/susumonitor/agent.env` 时脚本读取现有 `AGENT_SERVER_ID` + token，不重复预建。
 
 ### 方式 B：手动部署
 
