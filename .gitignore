@@ -69,3 +69,13 @@ tmp/
 
 # Codex is not used in this project
 .codex/
+
+# AI 工具本地目录（不入库，skills 以 .opencode/skills 为正式副本）
+.agents/
+.zcode/
+
+# 临时备份文件
+*.bak
+
+# Go Agent 本地编译产物
+agent-go-SuMon/susumonitor-agent*

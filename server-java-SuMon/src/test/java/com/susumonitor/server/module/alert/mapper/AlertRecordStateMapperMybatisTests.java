@@ -1,0 +1,138 @@
+package com.susumonitor.server.module.alert.mapper;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import com.susumonitor.server.module.alert.entity.AlertRecordEntity;
+import com.susumonitor.server.module.alert.entity.AlertStateEntity;
+import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.Statement;
+import java.time.LocalDateTime;
+import org.apache.ibatis.datasource.pooled.PooledDataSource;
+import org.apache.ibatis.io.Resources;
+import org.apache.ibatis.mapping.Environment;
+import org.apache.ibatis.session.Configuration;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+/**
+ * 验证告警记录和状态 XML Mapper 的真实参数绑定和主键回填行为。
+ */
+class AlertRecordStateMapperMybatisTests {
+
+    private SqlSessionFactory sqlSessionFactory;
+
+    /** 每个用例初始化独立 H2 库，确保 DML 断言不受其他用例影响。 */
+    @BeforeEach
+    void setUp() throws Exception {
+        PooledDataSource dataSource = new PooledDataSource(
+                "org.h2.Driver", "jdbc:h2:mem:alert_record_state_mapper;MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
+        try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
+            statement.execute("DROP TABLE IF EXISTS alert_states");
+            statement.execute("DROP TABLE IF EXISTS alert_records");
+            statement.execute("""
+                    CREATE TABLE alert_records (
+                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                        rule_id BIGINT,
+                        server_id BIGINT NOT NULL,
+                        metric VARCHAR(30) NOT NULL,
+                        current_value DECIMAL(12, 2) NOT NULL,
+                        threshold_value DECIMAL(12, 2) NOT NULL,
+                        level VARCHAR(20) NOT NULL,
+                        status VARCHAR(20) NOT NULL,
+                        message VARCHAR(500) NOT NULL,
+                        read_by BIGINT,
+                        read_at TIMESTAMP,
+                        triggered_at TIMESTAMP NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE alert_states (
+                        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                        rule_id BIGINT NOT NULL,
+                        server_id BIGINT NOT NULL,
+                        active BOOLEAN NOT NULL,
+                        alert_record_id BIGINT,
+                        first_triggered_at TIMESTAMP,
+                        last_triggered_at TIMESTAMP,
+                        resolved_at TIMESTAMP,
+                        version INT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """);
+        }
+
+        Environment environment = new Environment("test", new JdbcTransactionFactory(), dataSource);
+        Configuration configuration = new Configuration(environment);
+        configuration.addMapper(AlertRecordMapper.class);
+        configuration.addMapper(AlertStateMapper.class);
+        parseMapper(configuration, "mapper/alert/AlertRecordMapper.xml");
+        parseMapper(configuration, "mapper/alert/AlertStateMapper.xml");
+        sqlSessionFactory = new SqlSessionFactoryBuilder().build(configuration);
+    }
+
+    /** INSERT 应按 record 前缀绑定参数，并将数据库生成的 ID 回写到实体。 */
+    @Test
+    void insertRecordShouldGenerateId() {
+        AlertRecordEntity record = newRecord();
+
+        try (SqlSession session = sqlSessionFactory.openSession(true)) {
+            assertEquals(1, session.getMapper(AlertRecordMapper.class).insertRecord(record));
+        }
+
+        assertNotNull(record.getId());
+    }
+
+    /** INSERT 应按 state 前缀绑定参数，并将数据库生成的 ID 回写到实体。 */
+    @Test
+    void insertStateShouldGenerateId() {
+        AlertStateEntity state = newState();
+
+        try (SqlSession session = sqlSessionFactory.openSession(true)) {
+            assertEquals(1, session.getMapper(AlertStateMapper.class).insertState(state));
+        }
+
+        assertNotNull(state.getId());
+    }
+
+    private void parseMapper(Configuration configuration, String resource) throws Exception {
+        try (var mapperXml = Resources.getResourceAsReader(resource)) {
+            new org.apache.ibatis.builder.xml.XMLMapperBuilder(mapperXml, configuration, resource,
+                    configuration.getSqlFragments()).parse();
+        }
+    }
+
+    private AlertRecordEntity newRecord() {
+        AlertRecordEntity record = new AlertRecordEntity();
+        record.setRuleId(1L);
+        record.setServerId(1L);
+        record.setMetric("cpu");
+        record.setCurrentValue(new BigDecimal("90"));
+        record.setThresholdValue(new BigDecimal("80"));
+        record.setLevel("warning");
+        record.setStatus("unread");
+        record.setMessage("cpu > 80 (current: 90)");
+        record.setTriggeredAt(LocalDateTime.now());
+        return record;
+    }
+
+    private AlertStateEntity newState() {
+        AlertStateEntity state = new AlertStateEntity();
+        state.setRuleId(1L);
+        state.setServerId(1L);
+        state.setActive(true);
+        state.setAlertRecordId(1L);
+        state.setFirstTriggeredAt(LocalDateTime.now());
+        state.setLastTriggeredAt(LocalDateTime.now());
+        state.setVersion(0);
+        return state;
+    }
+}

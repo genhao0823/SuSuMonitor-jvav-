@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +44,8 @@ public class AlertRuleServiceImpl implements AlertRuleService {
         entity.setEnabled(true);
         entity.setDeleted(false);
         entity.setCreatedBy(createdBy);
-        ruleMapper.insertRule(entity);
+        ensureNoActiveRuleWithSameSignature(entity, null);
+        insertRule(entity);
         return toVo(ruleMapper.selectActiveRuleById(entity.getId()));
     }
 
@@ -55,7 +57,9 @@ public class AlertRuleServiceImpl implements AlertRuleService {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
         }
         validateLevel(request.getLevel());
-        ruleMapper.updateRule(ruleId, request.getThresholdValue(), request.getLevel(), request.getEnabled());
+        ensureNoActiveRuleWithSameSignature(entity.getServerId(), entity.getMetric(), entity.getOperator(),
+                request.getThresholdValue(), request.getLevel(), ruleId);
+        updateRuleWithConflictTranslation(ruleId, request);
         return toVo(ruleMapper.selectActiveRuleById(ruleId));
     }
 
@@ -88,6 +92,34 @@ public class AlertRuleServiceImpl implements AlertRuleService {
     private void validateLevel(String level) {
         if (AlertLevel.fromValue(level) == null) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST_PARAMETER);
+        }
+    }
+
+    private void ensureNoActiveRuleWithSameSignature(AlertRuleEntity rule, Long excludeId) {
+        ensureNoActiveRuleWithSameSignature(rule.getServerId(), rule.getMetric(), rule.getOperator(),
+                rule.getThresholdValue(), rule.getLevel(), excludeId);
+    }
+
+    private void ensureNoActiveRuleWithSameSignature(Long serverId, String metric, String operator,
+            java.math.BigDecimal thresholdValue, String level, Long excludeId) {
+        if (ruleMapper.existsActiveRule(serverId, metric, operator, thresholdValue, level, excludeId)) {
+            throw new BusinessException(ErrorCode.RESOURCE_CONFLICT);
+        }
+    }
+
+    private void insertRule(AlertRuleEntity entity) {
+        try {
+            ruleMapper.insertRule(entity);
+        } catch (DuplicateKeyException exception) {
+            throw new BusinessException(ErrorCode.RESOURCE_CONFLICT, exception);
+        }
+    }
+
+    private void updateRuleWithConflictTranslation(Long ruleId, UpdateAlertRuleRequest request) {
+        try {
+            ruleMapper.updateRule(ruleId, request.getThresholdValue(), request.getLevel(), request.getEnabled());
+        } catch (DuplicateKeyException exception) {
+            throw new BusinessException(ErrorCode.RESOURCE_CONFLICT, exception);
         }
     }
 

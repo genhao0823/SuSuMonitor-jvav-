@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 /**
  * 验证告警规则 CRUD 服务。
@@ -61,6 +63,65 @@ class AlertRuleServiceTests {
         assertEquals(1L, vo.getId());
         assertEquals("cpu", vo.getMetric());
         assertEquals("warning", vo.getLevel());
+    }
+
+    /** 已存在同签名活跃规则时创建应返回 40900。 */
+    @Test
+    void createDuplicateRuleShouldReturnConflict() {
+        service = new AlertRuleServiceImpl(ruleMapper, CLOCK);
+        CreateAlertRuleRequest request = createRequest("80", "warning");
+        when(ruleMapper.existsActiveRule(1L, "cpu", ">", new BigDecimal("80"), "warning", null))
+                .thenReturn(true);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.createRule(request, 10L));
+
+        assertEquals(ErrorCode.RESOURCE_CONFLICT, exception.getErrorCode());
+        verify(ruleMapper, org.mockito.Mockito.never()).insertRule(any());
+    }
+
+    /** 并发场景下数据库唯一约束触发时创建应返回 40900。 */
+    @Test
+    void createDuplicateKeyShouldReturnConflict() {
+        service = new AlertRuleServiceImpl(ruleMapper, CLOCK);
+        CreateAlertRuleRequest request = createRequest("80", "warning");
+        doThrow(new DuplicateKeyException("duplicate")).when(ruleMapper).insertRule(any());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.createRule(request, 10L));
+
+        assertEquals(ErrorCode.RESOURCE_CONFLICT, exception.getErrorCode());
+    }
+
+    /** 更新为其他活跃规则的同签名时应返回 40900。 */
+    @Test
+    void updateToDuplicateRuleShouldReturnConflict() {
+        service = new AlertRuleServiceImpl(ruleMapper, CLOCK);
+        when(ruleMapper.selectActiveRuleById(1L)).thenReturn(ruleEntity(1L, "cpu", ">", "80", "warning"));
+        UpdateAlertRuleRequest request = updateRequest("90", "critical", true);
+        when(ruleMapper.existsActiveRule(1L, "cpu", ">", new BigDecimal("90"), "critical", 1L))
+                .thenReturn(true);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.updateRule(1L, request));
+
+        assertEquals(ErrorCode.RESOURCE_CONFLICT, exception.getErrorCode());
+        verify(ruleMapper, org.mockito.Mockito.never()).updateRule(anyLong(), any(), any(), any());
+    }
+
+    /** 并发场景下数据库唯一约束触发时更新应返回 40900。 */
+    @Test
+    void updateDuplicateKeyShouldReturnConflict() {
+        service = new AlertRuleServiceImpl(ruleMapper, CLOCK);
+        when(ruleMapper.selectActiveRuleById(1L)).thenReturn(ruleEntity(1L, "cpu", ">", "80", "warning"));
+        UpdateAlertRuleRequest request = updateRequest("90", "critical", true);
+        doThrow(new DuplicateKeyException("duplicate")).when(ruleMapper)
+                .updateRule(1L, new BigDecimal("90"), "critical", true);
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> service.updateRule(1L, request));
+
+        assertEquals(ErrorCode.RESOURCE_CONFLICT, exception.getErrorCode());
     }
 
     /** 非法 metric 应返回 40002。 */
@@ -144,6 +205,24 @@ class AlertRuleServiceTests {
         assertEquals(2, rules.size());
         assertEquals("cpu", rules.get(0).getMetric());
         assertEquals("memory", rules.get(1).getMetric());
+    }
+
+    private CreateAlertRuleRequest createRequest(String threshold, String level) {
+        CreateAlertRuleRequest request = new CreateAlertRuleRequest();
+        request.setServerId(1L);
+        request.setMetric("cpu");
+        request.setOperator(">");
+        request.setThresholdValue(new BigDecimal(threshold));
+        request.setLevel(level);
+        return request;
+    }
+
+    private UpdateAlertRuleRequest updateRequest(String threshold, String level, boolean enabled) {
+        UpdateAlertRuleRequest request = new UpdateAlertRuleRequest();
+        request.setThresholdValue(new BigDecimal(threshold));
+        request.setLevel(level);
+        request.setEnabled(enabled);
+        return request;
     }
 
     private AlertRuleEntity ruleEntity(Long id, String metric, String operator,

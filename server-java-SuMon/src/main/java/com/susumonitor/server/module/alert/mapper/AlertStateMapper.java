@@ -18,7 +18,7 @@ public interface AlertStateMapper {
     AlertStateEntity selectByRuleAndServer(@Param("ruleId") Long ruleId, @Param("serverId") Long serverId);
 
     /** 插入新状态行，回写主键。 */
-    int insertState(AlertStateEntity state);
+    int insertState(@Param("state") AlertStateEntity state);
 
     /** 更新状态为活跃，设置 alert_record_id 和 last_triggered_at，version + 1。 */
     int updateStateActive(@Param("id") Long id, @Param("alertRecordId") Long alertRecordId,

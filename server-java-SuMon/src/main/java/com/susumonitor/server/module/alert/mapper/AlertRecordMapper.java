@@ -13,7 +13,7 @@ import org.apache.ibatis.annotations.Param;
 public interface AlertRecordMapper {
 
     /** 插入告警记录，回写主键。 */
-    int insertRecord(AlertRecordEntity record);
+    int insertRecord(@Param("record") AlertRecordEntity record);
 
     /** 根据主键查询单条记录。 */
     AlertRecordEntity selectRecordById(@Param("id") Long id);

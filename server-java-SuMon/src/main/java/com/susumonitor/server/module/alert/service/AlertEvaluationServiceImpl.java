@@ -65,8 +65,8 @@ public class AlertEvaluationServiceImpl implements AlertEvaluationService {
             try {
                 evaluateRule(rule, metrics);
             } catch (Exception exception) {
-                log.warn("alert evaluation failed, ruleId={}, serverId={}, error={}",
-                        rule.getId(), metrics.getServerId(), exception.getMessage());
+                log.warn("alert evaluation failed, ruleId={}, serverId={}",
+                        rule.getId(), metrics.getServerId(), exception);
             }
         }
     }

@@ -123,6 +123,21 @@ class AlertRuleControllerTests {
                 .andExpect(jsonPath("$.code").value(40002));
     }
 
+    /** 重复规则应返回 40900。 */
+    @Test
+    void duplicateRuleShouldReturnConflict() throws Exception {
+        authenticateAdmin();
+        doThrow(new BusinessException(ErrorCode.RESOURCE_CONFLICT))
+                .when(alertRuleService).createRule(any(CreateAlertRuleRequest.class), eq(1L));
+
+        mockMvc.perform(post("/api/alerts/rules")
+                        .header(AUTHORIZATION, ADMIN_BEARER)
+                        .contentType("application/json")
+                        .content("{\"metric\":\"cpu\",\"operator\":\">\",\"threshold_value\":80,\"level\":\"warning\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(40900));
+    }
+
     /** 更新不存在的规则应返回 40400。 */
     @Test
     void updateNonexistentShouldReturnNotFound() throws Exception {
