@@ -8,7 +8,6 @@ import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
 import com.susumonitor.server.module.alert.vo.AlertRecordVo;
-import com.susumonitor.server.module.metrics.service.MetricsService.MetricsReportedEvent;
 import com.susumonitor.server.module.metrics.vo.MetricsLatestVo;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -17,20 +16,14 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * 告警评估器，在 Metrics 事务提交后消费事件，评估规则并维护状态和记录。
+ * 告警评估器：对一次指标快照评估全部匹配规则并维护状态和记录。
  *
- * <p>使用 @TransactionalEventListener(AFTER_COMMIT) 确保只对已提交的
- * 指标数据进行评估。评估方法加 @Transactional 开启独立事务，告警评估
- * 失败不影响指标写入。评估事务提交后发布的 AlertTriggeredEvent 由
- * AlertPushPublisher 在 AFTER_COMMIT 推送 WebSocket。</p>
+ * <p>MVP-11 起由消息消费者（{@code AlertMessageConsumer}）在消费事务内调用，
+ * 评估结果与消费幂等记录同事务提交；失败由消费者重试，不在此处吞异常。</p>
  *
  * <p>状态迁移通过 AlertStateMachine 纯逻辑判断，数据库操作通过 Mapper
  * 执行。乐观锁冲突时记录 warn 日志并跳过本轮，不重试。</p>
@@ -48,15 +41,14 @@ public class AlertEvaluationServiceImpl implements AlertEvaluationService {
     private final Clock clock;
 
     /**
-     * 消费 Metrics 事件，评估该服务器匹配的所有启用规则。
+     * 对指标快照执行全部匹配规则的评估。
      *
-     * <p>AFTER_COMMIT 确保指标已落库。@Transactional 开启新事务，
-     * 告警状态和记录写入独立于 Metrics 事务。</p>
+     * <p>事务边界由调用方（消息消费者）管理，本方法以 REQUIRED 加入调用方事务，
+     * 保证评估写入与消费幂等记录同事务提交或回滚。</p>
      */
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void onMetricsReported(MetricsReportedEvent event) {
-        MetricsLatestVo metrics = event.metrics();
+    @Override
+    @Transactional
+    public void evaluate(MetricsLatestVo metrics) {
         List<AlertRuleEntity> rules = ruleMapper.selectEnabledRulesForServer(metrics.getServerId());
         if (rules.isEmpty()) {
             return;

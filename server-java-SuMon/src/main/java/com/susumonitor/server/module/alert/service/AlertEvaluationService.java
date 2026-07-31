@@ -1,12 +1,15 @@
 package com.susumonitor.server.module.alert.service;
 
-import com.susumonitor.server.module.metrics.service.MetricsService.MetricsReportedEvent;
+import com.susumonitor.server.module.metrics.vo.MetricsLatestVo;
 
 /**
- * 定义事务提交后指标告警评估的事件处理契约。
+ * 告警评估契约：对一次指标快照执行该服务器全部匹配规则的状态迁移与记录生成。
+ *
+ * <p>事务边界由调用方管理：消息消费者（MVP-11）在消费事务内调用，
+ * 保证评估结果与消费幂等记录同事务提交。</p>
  */
 public interface AlertEvaluationService {
 
-    /** 消费已提交的指标事件并评估对应告警规则。 */
-    void onMetricsReported(MetricsReportedEvent event);
+    /** 对指标快照执行全部匹配规则的告警评估。 */
+    void evaluate(MetricsLatestVo metrics);
 }

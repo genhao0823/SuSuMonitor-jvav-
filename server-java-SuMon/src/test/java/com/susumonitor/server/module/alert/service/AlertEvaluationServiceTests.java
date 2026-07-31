@@ -14,7 +14,6 @@ import com.susumonitor.server.module.alert.entity.AlertStateEntity;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
-import com.susumonitor.server.module.metrics.service.MetricsService.MetricsReportedEvent;
 import com.susumonitor.server.module.metrics.vo.MetricsLatestVo;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -61,7 +60,7 @@ class AlertEvaluationServiceTests {
         when(ruleMapper.selectEnabledRulesForServer(1L)).thenReturn(List.of(rule));
         when(stateMapper.selectByRuleAndServer(1L, 1L)).thenReturn(null);
 
-        service.onMetricsReported(new MetricsReportedEvent(metrics));
+        service.evaluate(metrics);
 
         verify(recordMapper).insertRecord(any(AlertRecordEntity.class));
         verify(stateMapper).insertState(any(AlertStateEntity.class));
@@ -79,7 +78,7 @@ class AlertEvaluationServiceTests {
         when(stateMapper.selectByRuleAndServer(1L, 1L)).thenReturn(state);
         when(stateMapper.updateStateActive(anyLong(), anyLong(), any(LocalDateTime.class), eq(0))).thenReturn(1);
 
-        service.onMetricsReported(new MetricsReportedEvent(metrics));
+        service.evaluate(metrics);
 
         verify(stateMapper).updateStateActive(eq(1L), eq(1L), any(LocalDateTime.class), eq(0));
         verify(recordMapper, never()).insertRecord(any());
@@ -97,7 +96,7 @@ class AlertEvaluationServiceTests {
         when(stateMapper.selectByRuleAndServer(1L, 1L)).thenReturn(state);
         when(stateMapper.deleteState(eq(1L), eq(0))).thenReturn(1);
 
-        service.onMetricsReported(new MetricsReportedEvent(metrics));
+        service.evaluate(metrics);
 
         verify(recordMapper).updateStatusToResolved(eq(1L), any(LocalDateTime.class));
         verify(stateMapper).deleteState(eq(1L), eq(0));
@@ -113,7 +112,7 @@ class AlertEvaluationServiceTests {
         when(ruleMapper.selectEnabledRulesForServer(1L)).thenReturn(List.of(rule));
         when(stateMapper.selectByRuleAndServer(1L, 1L)).thenReturn(null);
 
-        service.onMetricsReported(new MetricsReportedEvent(metrics));
+        service.evaluate(metrics);
 
         verify(recordMapper).insertRecord(any(AlertRecordEntity.class));
         verify(stateMapper).insertState(any(AlertStateEntity.class));
@@ -127,7 +126,7 @@ class AlertEvaluationServiceTests {
         MetricsLatestVo metrics = metrics(bd("90"));
         when(ruleMapper.selectEnabledRulesForServer(1L)).thenReturn(List.of());
 
-        service.onMetricsReported(new MetricsReportedEvent(metrics));
+        service.evaluate(metrics);
 
         verify(stateMapper, never()).selectByRuleAndServer(anyLong(), anyLong());
         verify(recordMapper, never()).insertRecord(any());
@@ -145,7 +144,7 @@ class AlertEvaluationServiceTests {
         when(stateMapper.selectByRuleAndServer(eq(1L), eq(1L))).thenReturn(null);
         when(stateMapper.selectByRuleAndServer(eq(2L), eq(1L))).thenReturn(null);
 
-        service.onMetricsReported(new MetricsReportedEvent(metrics));
+        service.evaluate(metrics);
 
         verify(recordMapper, times(2)).insertRecord(any(AlertRecordEntity.class));
         verify(stateMapper, times(2)).insertState(any(AlertStateEntity.class));
@@ -163,7 +162,7 @@ class AlertEvaluationServiceTests {
         when(stateMapper.selectByRuleAndServer(1L, 1L)).thenReturn(state);
         when(stateMapper.updateStateActive(anyLong(), anyLong(), any(LocalDateTime.class), eq(0))).thenReturn(0);
 
-        service.onMetricsReported(new MetricsReportedEvent(metrics));
+        service.evaluate(metrics);
 
         verify(stateMapper).updateStateActive(eq(1L), eq(1L), any(LocalDateTime.class), eq(0));
         verify(recordMapper, never()).insertRecord(any());
@@ -181,7 +180,7 @@ class AlertEvaluationServiceTests {
         when(stateMapper.selectByRuleAndServer(1L, 1L)).thenThrow(new RuntimeException("DB error"));
         when(stateMapper.selectByRuleAndServer(2L, 1L)).thenReturn(null);
 
-        service.onMetricsReported(new MetricsReportedEvent(metrics));
+        service.evaluate(metrics);
 
         // rule2 仍应正常评估。
         verify(recordMapper, times(1)).insertRecord(any(AlertRecordEntity.class));
