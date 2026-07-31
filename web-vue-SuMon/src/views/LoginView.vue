@@ -52,15 +52,15 @@
             忘记密码?
           </a>
         </div>
-        <el-button
-          type="primary"
-          native-type="submit"
-          :loading="submitting"
-          class="login-view__submit"
-          @click="handleSubmit"
+        <button
+          type="button"
+          :disabled="submitting"
+          class="el-button el-button--primary login-view__submit"
+          @click.prevent="onLoginClick"
         >
-          登 录
-        </el-button>
+          <span v-if="submitting">登录中...</span>
+          <span v-else>登 录</span>
+        </button>
         <div class="login-view__footer">
           <span>还没有账户?</span>
           <router-link :to="{ name: 'register' }">
@@ -168,14 +168,6 @@ function resolveRedirect(): string {
 }
 
 async function handleSubmit(): Promise<void> {
-  if (formRef.value === undefined) {
-    return
-  }
-  try {
-    await formRef.value.validate()
-  } catch {
-    return
-  }
   submitting.value = true
   try {
     await auth.login(
@@ -189,6 +181,10 @@ async function handleSubmit(): Promise<void> {
   } finally {
     submitting.value = false
   }
+}
+
+function onLoginClick(): void {
+  void handleSubmit()
 }
 
 /**

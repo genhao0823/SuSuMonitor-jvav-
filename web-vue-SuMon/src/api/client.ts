@@ -32,10 +32,18 @@ export function setApiClientCallbacks(next: ApiClientCallbacks | undefined): voi
 /**
  * 生成 UUID v4 字符串,用于 X-Correlation-ID 请求头。
  *
- * @returns 标准 UUID v4 字符串
+ * 注意:crypto.randomUUID 仅在安全上下文(HTTPS 或 localhost)下可用;
+ * 站点以明文 HTTP 提供服务时该方法不存在,直接调用会抛
+ * "crypto.randomUUID is not a function",导致请求拦截器在请求发出前失败
+ * (表现为点击登录后 network 面板无任何请求)。此处对非安全上下文降级,
+ * 与 services/terminal-ws.ts 的兜底策略保持一致。
+ *
+ * @returns 安全上下文返回标准 UUID v4;否则返回基于时间戳+随机数的降级 ID
  */
 export function newCorrelationId(): string {
-  return crypto.randomUUID()
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
 /**

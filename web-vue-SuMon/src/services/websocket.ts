@@ -2,6 +2,7 @@ import type { AlertPushPayload } from '@/types/api'
 import { isAlertPush } from '@/api/alert'
 import type { MetricsLatest } from '@/types/metrics'
 import { issueMonitorTicket } from '@/api/websocket'
+import { newCorrelationId } from '@/api/client'
 
 /**
  * `/ws/monitor` 通用消息帧。
@@ -92,7 +93,7 @@ export class MonitorWebSocket {
     try {
       this.socket.send(JSON.stringify({
         type: 'metrics.unsubscribe',
-        message_id: crypto.randomUUID(),
+        message_id: newCorrelationId(),
         payload: { server_id: this.activeServerId }
       }))
     } catch {
@@ -126,7 +127,7 @@ export class MonitorWebSocket {
       }
       this.socket?.send(JSON.stringify({
         type: 'metrics.subscribe',
-        message_id: crypto.randomUUID(),
+        message_id: newCorrelationId(),
         payload: { server_id: serverId }
       }))
     }

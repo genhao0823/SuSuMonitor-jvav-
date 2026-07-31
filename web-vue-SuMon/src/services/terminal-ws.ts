@@ -27,6 +27,42 @@ function decodeBase64(base64: string): string {
   return new TextDecoder().decode(bytes)
 }
 
+/**
+ * 生成 UUID v4 字符串,用于终端 WS 帧 message_id。
+ *
+ * 注意:后端 TerminalProtocolValidator 校验 message_id 必须为 UUID。
+ * crypto.randomUUID 仅在安全上下文(HTTPS/localhost)可用;站点以明文 HTTP
+ * 提供服务时该方法不存在,需降级到 crypto.getRandomValues(非安全上下文可用)
+ * 手动拼装 UUID v4,否则 terminal.open 会因 message_id 非 UUID 被后端拒绝
+ * (40003 invalid payload),表现为终端建链失败、黑框无响应。
+ */
+function newTerminalMessageId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return uuidv4Fallback()
+}
+
+/** 非安全上下文降级:用 getRandomValues 生成标准 UUID v4(RFC 4122)。 */
+function uuidv4Fallback(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const b = new Uint8Array(16)
+    crypto.getRandomValues(b)
+    b[6] = (b[6] & 0x0f) | 0x40
+    b[8] = (b[8] & 0x3f) | 0x80
+    const h: string[] = []
+    for (let i = 0; i < 16; i++) {
+      h.push(b[i].toString(16).padStart(2, '0'))
+    }
+    return `${h.slice(0, 4).join('')}-${h.slice(4, 6).join('')}-${h.slice(6, 8).join('')}-${h.slice(8, 10).join('')}-${h.slice(10, 16).join('')}`
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 /** 把任意字符串压缩为 WS 帧外壳(自动生成 message_id + UTC ISO timestamp)。 */
 function wrapFrame<T extends string, P>(
   type: T,
@@ -34,10 +70,7 @@ function wrapFrame<T extends string, P>(
 ): { type: T; message_id: string; timestamp: string; payload: P } {
   return {
     type,
-    message_id:
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    message_id: newTerminalMessageId(),
     timestamp: new Date().toISOString(),
     payload
   }
