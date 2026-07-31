@@ -124,7 +124,7 @@ SuSuMonitor/
 | MVP-5A | 登录、注册、仪表盘、服务器列表和详情前端，直接对接真实 API | 已实现；告警与 Web SSH 不在本阶段 |
 | MVP-6 | 模块化单体告警业务闭环：规则、状态机去重、记录、查询、已读、恢复和 WebSocket 推送；暂不依赖 RabbitMQ | 后端业务闭环已实现（Commit `7b01a60`，2026-07-25，含 Flyway `V10__create_alert_states_and_soft_delete_rules`、`AlertPushPublisher` 推送 `alert.push`、OpenAPI 6 端点）；前端告警页面未实现；真实 HTTP/WS 端到端链路未验证 |
 | MVP-7 | SSH 后端代理、PTY、多会话、20 分钟超时和 xterm.js 前端 | T1-T3 已完成（Java 端中继、Go Agent Linux PTY、协议契约），真实 WSL 单 JVM 联调通过 `PTY_RELAY_INTEGRATION_OK`（2026-07-26）；T4（xterm.js 前端）、T5（OpenCloudOS 云端部署）、T6（家庭 Linux 主机 root systemd 部署）未完成；Monitor 1012 真实背压未覆盖（2026-07-27 流控 WSL 验收） |
-| MVP-8 | 安装、启动、升级、回滚、备份恢复和安全检查文档 | 否 |
+| MVP-8 | 安装、启动、升级、回滚、备份恢复和安全检查文档 | 已收口（2026-07-31）：Use-manual 手册系列（部署安装/升级回滚/备份恢复/安全检查/RabbitMQ 运维）+ `deploy/backup.sh`/`restore.sh` 配套脚本；恢复与安全检查空白已补齐 |
 
 当前 MVP-1 至 MVP-8 默认采用模块化单体架构。微服务只作为 MVP-8 之后的增强路线，不改变当前 MVP-1 的开发顺序，也不作为本机调试前置依赖。
 

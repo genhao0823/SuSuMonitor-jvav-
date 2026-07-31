@@ -20,6 +20,9 @@
 > | **计划中** | 仅出现在 plan 文档，未进入开发 |
 > | **outdated** | 文档陈旧但保留作历史快照 |
 >
+> **总体状态（2026-07-31 对齐说明，详见 `docs-SuMon/Use-manual/README.md`）**：
+> **MVP-8 运维文档完成（2026-07-31）**：Use-manual 手册系列落地（Server 部署安装 / 升级与回滚 / 备份与恢复 / 安全检查 / RabbitMQ 运维 + Go-Agent 手册索引）；配套 `deploy/backup.sh` 与 `deploy/restore.sh`（补齐 DEPLOYMENT.md 明言的"无备份脚本"空白）；恢复与安全检查两大空白已系统化；TLS/HTTPS 仍待域名备案（手册含计划与边界）。
+>
 > **总体状态（2026-07-31 对齐说明，详见 `docs-SuMon/Develop-log/20260731-MVP10-Metrics-Outbox.md`）**：
 > **MVP-10 Metrics Outbox 完成（2026-07-31）**：指标入库与 `message_outbox` 同事务写入，发布器经 RabbitMQ（Publisher Confirm/Return + 指数退避）可靠投递；真实 Broker 三阶段验收 PASS（正常/停机/恢复补发）；`/api/ready` 增加 RabbitMQ 检查（存活但未就绪语义，50301）；本地事件链路保留，告警零中断；消费侧（MVP-11）未启动，队列消息堆积为预期。
 >

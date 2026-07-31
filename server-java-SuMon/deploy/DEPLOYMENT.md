@@ -79,7 +79,7 @@ Nginx 默认访问日志不包含 WebSocket 帧正文。不要为排障记录终
 4. 再启动应用，由 Flyway 执行向前迁移；禁止修改或重置已执行的迁移历史。
 5. 检查 `GET /api/health`、`GET /api/ready`、`systemctl status` 和 Flyway 日志后才宣布发布完成。
 
-本仓库不提供自动执行生产数据库备份或恢复的脚本，避免在未确认目标和影响范围时误操作。
+> **2026-07-31 更新（MVP-8）**：本仓库现已提供备份与恢复脚本——`deploy/backup.sh`（mysqldump 一致性全量 + server.env 密钥 + 校验轮换）与 `deploy/restore.sh`（备份包校验 + 覆盖式恢复 + 验证清单），操作见 `docs-SuMon/Use-manual/SuSuMonitor-备份与恢复手册.md`。脚本同样要求先确认目标与影响范围，恢复前必须停止应用。
 
 ## 升级与回滚
 
