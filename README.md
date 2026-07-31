@@ -20,11 +20,17 @@
 > | **计划中** | 仅出现在 plan 文档，未进入开发 |
 > | **outdated** | 文档陈旧但保留作历史快照 |
 >
+> **总体状态（2026-07-31 对齐说明，详见 `docs-SuMon/Develop-log/20260731-MVP10-Metrics-Outbox.md`）**：
+> **MVP-10 Metrics Outbox 完成（2026-07-31）**：指标入库与 `message_outbox` 同事务写入，发布器经 RabbitMQ（Publisher Confirm/Return + 指数退避）可靠投递；真实 Broker 三阶段验收 PASS（正常/停机/恢复补发）；`/api/ready` 增加 RabbitMQ 检查（存活但未就绪语义，50301）；本地事件链路保留，告警零中断；消费侧（MVP-11）未启动，队列消息堆积为预期。
+>
 > **总体状态（2026-07-31 对齐说明，详见 `docs-SuMon/Develop-log/20260731-MVP9-数据所有权与依赖审计.md`、`20260731-MVP9-契约冻结评审与出口条件核对.md`）**：
 > **MVP-9 收口完成（2026-07-31）**：性能基线 7 场景实测 PASS（`api-test/bench-alert-chain.mjs`，p50/p95/p99 见 `20260728-MVP-9-Java后端性能基线.md` §九~§十）；数据所有权审计完成并收口 3 处跨模块 Mapper 访问（admin/metrics/terminal 改走 Service 契约）；RabbitMQ 消息契约与拓扑完成评审冻结。过程中修复 1 个真实 bug：告警恢复后不再触发（`handleResolve` 改为删除 state 行，commit `f7dba69`，verify-alert-ws 24/24 复核通过）。
 >
 > **总体状态（2026-07-27 对齐说明，详见 `docs-SuMon/Develop-log/20260727-项目状态与契约最终收口.md`）**：
-> 本机闭环（M1-M6 + Sprint 1-4 + Polish 1-6）已实现并本机运行时验证；MVP-6 后端业务闭环已实现（Commit 7b01a60，前端告警页面未实现）；MVP-7 终端 T1-T3 已完成（PTY_RELAY_INTEGRATION_OK 2026-07-26）；真实 SSH `50003`/`50002` 分类已于 2026-07-25 通过 Apifox 验收。仍属“未验证”：首管理员空库并发、公网部署真实链路、多 JVM AFTER_COMMIT 事件跨实例、Agent Linux 二进制真实 WSS、Monitor 1012 真实背压覆盖。
+> 本机闭环（M1-M6 + Sprint 1-4 + Polish 1-6）已实现并本机运行时验证；MVP-6 后端业务闭环已实现（Commit 7b01a60，前端告警页面未实现）；MVP-7 终端 T1-T3 已完成（PTY_RELAY_INTEGRATION_OK 2026-07-26）；真实 SSH `50003`/`50002` 分类已于 2026-07-25 通过 Apifox 验收。仍属”未验证”：首管理员空库并发、公网部署真实链路、多 JVM AFTER_COMMIT 事件跨实例、Agent Linux 二进制真实 WSS、Monitor 1012 真实背压覆盖。
+>
+> **总体状态（2026-07-31 文档对齐修订，仅文档层，逐项核对代码事实）**：
+> 本次修订把下方”未验证 / 未实现 / 部署资产缺口”清单与代码事实逐项对齐，已闭环项见各清单内的划线注明：**公网明文 HTTP 云端部署已跑通**（2026-07-31，腾讯云 OpenCloudOS，前端+后端+Agent 端到端，见 `docs-SuMon/Handoff-SuMon/20260731-云端部署调试交接.md`；HTTPS/WSS 待域名备案）；**MVP-6 告警前端已收口**（2026-07-27 Sprint 0-7，真实 HTTP/WS 端到端链路 2026-07-28 验收通过）；**MVP-7 T4 xterm.js 前端已完成**（2026-07-28 最小可用版本）；**T5 部署资产已补齐**（Maven Wrapper / `application-prod.yml` / systemd Unit / Nginx 站点配置，2026-07-27）；**B-005/B-006/B-007 已闭环**（Agent 采集上报接入 + `build-linux` + Linux amd64 二进制实测）；**B-037/B-038 已收口**（`openapi-system.json:info.title` 补齐 + 前端 4 端点契约封装与真实浏览器联调，2026-07-29）；**后端限流 / CORS 已实现**。仍属”未验证/未实现”：首管理员空库并发、多 JVM AFTER_COMMIT 事件跨实例、Monitor 1012 真实背压、HTTPS/WSS、Dockerfile/docker-compose、数据库备份脚本、Android App、告警外部通知渠道。
 
 ## 项目简介
 
@@ -72,39 +78,41 @@ SuSuMonitor 是一套**前后端 + Agent 全栈**的服务器监控系统,主题
 
 1. **首管理员空库并发注册** — V7 行锁已实现但真实空库并发未跑。
 2. _(已通过：真实 SSH `50003`/`50002` 分类已于 2026-07-25 通过 Apifox 受控 SSHD 真实验收，详见 `docs-SuMon/Develop-log/20260725-Apifox-SSH-50003-真实验收.md`、 `20260725-Apifox-SSH-50002-真实验收.md`)_
-3. **公网部署真实链路** — 当前所有能力仅本机验证。
+3. _(已通过：公网明文 HTTP 云端部署已于 2026-07-31 跑通（前端+后端+Agent 端到端），见 `docs-SuMon/Handoff-SuMon/20260731-云端部署调试交接.md`；HTTPS/WSS 待域名备案后验证)_
 4. **多 JVM 实例下 AFTER_COMMIT 事件跨实例推送** — `MonitorTicketService` / `AgentConnectionRegistry` / `MetricsCleanupService` 全部为单 JVM 内存状态。
-5. **Agent Linux 二进制真实运行 + WSS 长连接** — `Makefile` 缺 `build-linux` target（B-007），二进制未交叉构建。
-6. **SSH 主机指纹白名单自动化** — V8 字段已加，业务未跑。
-7. **Web 前端 SSH 历史卡 + spark 历史卡** — `web-vue-SuMon/README.md:115-117` 显式标 mock/占位。
-8. **OpenAPI 6 个已实现端点未签**（B-038）— `openapi-system.json:info.title` 缺（B-037），pre-commit 钩子需 `--no-verify` 绕过。
+5. _(已通过：`Makefile:build-linux` 已补（B-007 关闭），`agent-go-SuMon/bin/susumonitor-agent-linux-amd64` 已交叉构建并在云端真实运行（明文 WS，2026-07-31 端到端验证）；HTTPS/WSS 长连接仍待域名备案)_
+6. _(已通过：`PUT /api/servers/{id}/ssh/host-key` 首次确认/轮换已实现，通过 Apifox 9 用例 27 断言（2026-07-20）+ 前端真实浏览器联调（2026-07-29，B-038 收口）；"自动化强制校验"策略仍待评估)_
+7. _(已通过：spark line 已接真实 metrics 历史（Sprint 2/3 收口）；仅"SSH 测试历史卡"（`DashboardSshCard`）仍为占位，等待 SSH test history 接口)_
+8. _(已通过：前端已补齐 4 个未签端点契约封装并以真实浏览器联调收口（2026-07-29，B-038 关闭）；`openapi-system.json:info.title` 已补齐（B-037 关闭）)_
 
 ### 未实现（计划中或结构性缺口）
 
-1. **Maven Wrapper** — `README.md` 引用 `./mvnw`，仓库中无 wrapper。
-2. **`application-prod.yml`** — 默认 `APP_ENV=local`，无生产 Profile。
+1. _(已补齐：`server-java-SuMon/mvnw` + `mvnw.cmd`，2026-07-27 T5，`mvnw test` 326 全过)_
+2. _(已补齐：`server-java-SuMon/src/main/resources/application-prod.yml`，2026-07-27 T5)_
 3. **Dockerfile / docker-compose** — 全仓 0 命中。
-4. **Java systemd Unit** — 全仓 0 命中。
-5. **完整宝塔 Nginx 站点配置** — 全仓 0 命中。
+4. _(已补齐：`server-java-SuMon/deploy/susumonitor-server.service`，2026-07-27 T5)_
+5. _(已补齐：`server-java-SuMon/deploy/nginx-susumonitor.conf.example` + `susumonitor-vhost.conf`，2026-07-27 T5，云端已生效)_
 6. **数据库备份脚本** — `scripts/` 仅本地开发脚本。
-7. **MVP-6 告警前端** — 后端业务闭环（Commit `7b01a60`）+ 前端实现（2026-07-27 Sprint 0-7 收口；告警记录页 `/alerts/records`、告警规则页 `/alerts/rules`、菜单挂载、`alert.push` WS 消费）。
-8. **MVP-7 Web SSH 终端（xterm.js + Agent PTY）** — 仅规划。
-9. **MVP-9~14 微服务与分布式** — 仅规划。
+7. _(已实现：2026-07-27 Sprint 0-7 收口，告警记录页 `/alerts/records`、告警规则页 `/alerts/rules`、菜单挂载、`alert.push` WS 消费；真实端到端链路 2026-07-28 验收通过)_
+8. _(已实现：T4 xterm.js 前端最小可用版本 2026-07-28，路由 `/terminal/:serverId`；T5 云端部署已验证（明文 HTTP）、T6 家庭 Linux 主机部署仍待验)_
+9. _(MVP-9 已于 2026-07-31 收口：性能基线 7 场景 PASS + 数据所有权收口 + RabbitMQ 契约冻结；MVP-10~14 仍规划中)_
 10. **Android App** — `app-kt-SuMon/` 目录为空。
-11. **限流 / CORS / WebSocket Origin 白名单** — 后端 SecurityConfig 无相关配置。
+11. _(限流 / CORS 已实现：`AgentConnectionLimiter` / `AgentMessageRateLimiter` / Monitor 背压 + `config/CorsConfig.java`；WebSocket Origin 白名单策略仍待评估)_
 
 ### 部署资产缺口清单（必须在新分支中补齐后，才可上线公网）
 
+> 本表为 2026-07-25 快照；其中 6 项已于 T5（2026-07-27）补齐并云端实测，见"现状"列标注。
+
 | 缺口 | 现状 | 阻碍 |
 |---|---|---|
-| Maven Wrapper | 缺失 | CI / 跨机器构建不可复现 |
-| `application-prod.yml` | 缺失 | 生产配置沿用 local DEBUG 日志 |
+| Maven Wrapper | ~~缺失~~ → **已补齐**（2026-07-27 T5，`server-java-SuMon/mvnw`） | CI / 跨机器构建可复现（`mvnw test` 326 全过） |
+| `application-prod.yml` | ~~缺失~~ → **已补齐**（2026-07-27 T5，`src/main/resources/application-prod.yml`） | 生产配置已就绪 |
 | Dockerfile + docker-compose | 缺失 | 没有容器化交付路径 |
-| Java systemd Unit | 缺失 | 没有进程监管和优雅停机 |
-| 完整宝塔 Nginx 站点配置 | 缺失 | TLS / SPA fallback / WS Upgrade 均需手工拼 |
+| Java systemd Unit | ~~缺失~~ → **已补齐**（2026-07-27 T5，`server-java-SuMon/deploy/susumonitor-server.service`） | 进程监管和优雅停机已就绪 |
+| 完整宝塔 Nginx 站点配置 | ~~缺失~~ → **已补齐**（2026-07-27 T5，`deploy/nginx-susumonitor.conf.example` + `susumonitor-vhost.conf`） | 云端明文 HTTP 已跑通；TLS 待域名备案 |
 | 数据库备份脚本 | 缺失 | 没有任何异地归档策略 |
-| `agent-go-SuMon/Makefile:build-linux` target | 缺失（B-007） | Linux 二进制无法构建 |
-| `ssh_host_key_fingerprint` 自动化 | V8 字段 + `PUT /api/servers/{id}/ssh/host-key` 接口已实现并通过 Apifox 9 用例 27 断言（2026-07-20） | SSH 测试已闭环；终端仍依赖未来 xterm.js 接入 |
+| `agent-go-SuMon/Makefile:build-linux` target | ~~缺失（B-007）~~ → **已补齐**（`Makefile:6`；`bin/susumonitor-agent-linux-amd64` 已实测 + 云端真实运行） | Linux 二进制可构建 |
+| `ssh_host_key_fingerprint` 自动化 | V8 字段 + `PUT /api/servers/{id}/ssh/host-key` 接口已实现并通过 Apifox 9 用例 27 断言（2026-07-20）+ 前端真实浏览器联调（2026-07-29） | SSH 测试已闭环；终端已接入 xterm.js（T4，2026-07-28） |
 
 ### 文档与代码事实不一致项（本次对齐已修正或留痕）
 
@@ -112,8 +120,8 @@ SuSuMonitor 是一套**前后端 + Agent 全栈**的服务器监控系统,主题
 |---|---|
 | JWT 有效期 24 vs 72 小时 | 以代码 `application.yml:36` 与 `JwtKeyConfig` 的 72 小时为准；同步 `.env.example:14` 与 `本机开发环境配置.md:94` |
 | `ErrorCode:50003` 语义 | 代码 `ErrorCode.java:25` 为 `SSH_AUTHENTICATION_FAILED`；`项目需求与规范.md:176` 早期写为 `agent offline`，以代码为准 |
-| `openapi-system.json:info.title` | 仍为空（B-037），pre-commit 钩子已知遗留 |
-| 6 个 OpenAPI 端点缺失 | 仍属未签契约（B-038） |
+| `openapi-system.json:info.title` | 已补齐（B-037 关闭，2026-07-29） |
+| 6 个 OpenAPI 端点缺失 | 已收口（B-038 关闭，2026-07-29：前端 4 端点契约封装 + 真实浏览器联调） |
 
 ## 技术栈
 
@@ -259,5 +267,5 @@ go build -o susumonitor-agent ./cmd/susumonitor-agent
 - 110 个 git status dirty 文件(主因:`.apifox/` + `.mimocode/` + `.agents/` + `api-test/node_modules/` + `agent-go-SuMon/susumonitor-agent.exe` 未被 `.gitignore` 忽略;不影响代码)
 - 1 个 ui:e2e WARN(搜索 v-model 传递,可微调)
 - 3 个 LONG_FILE 实际超 500 行(525-565)但 INFO 严重度,阈值 600
-- `openapi-system.json` 缺 `info.title` 字段(预先存在 dirty,开 `git add` 钩子失败时可用 `--no-verify` 绕过)
+- ~~`openapi-system.json` 缺 `info.title` 字段~~（已补齐 2026-07-29，B-037 关闭；pre-commit 钩子相关 dirty 处理见上一条）
 - 详细文档对齐性检查与修正记录:见 `docs-SuMon/Bug-fix/2026-07-25-文档对齐性修复.md`

@@ -99,3 +99,19 @@ MVP-9 只完成文档评审、命名冻结和未来测试设计，不执行真�
 - Broker 中断、恢复和 Outbox 补发。
 - ACK、重复消费、重试耗尽和 DLQ 真实验证。
 - 消费者重启恢复、死信查询和受控重放。
+
+---
+
+## 八、实现确认（2026-07-31，MVP-10 落地）
+
+本文档冻结的发布侧拓扑已由 MVP-10 落地并真实验收（见 `Develop-log/20260731-MVP10-Metrics-Outbox.md`）：
+
+| 冻结项 | 实现 |
+|---|---|
+| Exchange/Queue/DLX/DLQ 自动声明 | `RabbitMqTopologyConfig`（durable、non-auto-delete、DLX 参数），broker 启动即声明，管理 API 确认 |
+| Publisher Confirm/Return | `CachingConnectionFactory` 开启 CORRELATED Confirm + Returns；`RabbitTemplate` mandatory=true；Confirm 经 `CorrelationData` future 同步读取 |
+| 发布侧重试参数（冻结） | 指数退避 `min(2^attempts, 300s)` 封顶（`OUTBOX_MAX_BACKOFF_SECONDS` 可配）；**发布侧不设失败上限**——Outbox 语义为 Broker 恢复后必须补发，与消费侧 DLQ 语义分离 |
+| Broker 中断、恢复和 Outbox 补发 | 真实验收 PASS：停机期间指标照常落库 + outbox 保留 pending；恢复后自动补发，队列消息数与停机前上报数一致 |
+| 时间口径 | 写入 UTC（应用时钟），轮询比较 `UTC_TIMESTAMP()`（修复会话时区偏差，见 Develop-log §三） |
+
+仍属 MVP-11：`susumonitor.alert.metrics` 消费者、ACK/重复消费、重试耗尽进 DLQ、DLQ 查询与受控重放。MVP-10 期间队列消息堆积为预期行为，不视为丢失。

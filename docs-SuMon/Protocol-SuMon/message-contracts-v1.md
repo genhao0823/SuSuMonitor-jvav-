@@ -122,3 +122,17 @@
 ## 六、未实现边界
 
 本文是契约冻结文档。当前代码尚未提供 RabbitMQ 发布、消费、JSON Schema 运行校验、Outbox 或 `message_consume_records`。这些能力分别属于 MVP-10/MVP-11，不能以本文档替代运行时验证。
+
+---
+
+## 七、实现确认（2026-07-31，MVP-10 落地）
+
+本文档 §二/§三 信封契约已由 MVP-10 的 `OutboxEnvelopeFactory` 实现（见 `Develop-log/20260731-MVP10-Metrics-Outbox.md`）：
+
+- 信封字段与示例完全一致（snake_case、`event_type=metrics.reported`、`schema_version=1`、`producer=metrics-service`）。
+- 时间格式固定为 UTC ISO-8601 秒级（`yyyy-MM-dd'T'HH:mm:ss'Z'`，与契约示例一致）。
+- `temperature`/`load_avg` 允许 null 并输出 JSON null。
+- 可选字段 `trace_id`/`correlation_id` 本阶段（MVP-10）不携带，消费侧不得要求必填。
+- 真实 Broker 验收已核对出队消息与本文契约一致（verify-outbox.mjs）。
+
+仍属 MVP-11：JSON Schema 运行校验、`message_consume_records`、消费幂等与 DLQ 分类执行。

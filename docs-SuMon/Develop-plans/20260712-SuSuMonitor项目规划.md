@@ -133,6 +133,7 @@ SuSuMonitor/
 | 阶段 | 内容 | 当前执行 |
 |------|------|----------|
 | MVP-9 | 微服务化准备：模块依赖、数据所有权、RabbitMQ 异步边界与版本化消息契约、统一日志和性能基线 | 已收口（2026-07-31）：性能基线 7 场景实测 + 数据所有权收口 + 契约冻结评审；RabbitMQ 运行时属 MVP-10/11 |
+| MVP-10 | `metrics-service`：Agent 指标处理、Outbox 可靠事件发布、指标存储、最新/历史查询和清理 | 已收口（2026-07-31）：V14 outbox 表 + 同事务写入 + 发布器（Confirm/Return/指数退避）+ 拓扑声明 + ready 检查；真实 Broker 三阶段验收 PASS（见 `Develop-log/20260731-MVP10-Metrics-Outbox.md`）；消费侧属 MVP-11 |
 | MVP-10 | `metrics-service`：Agent 指标处理、Outbox 可靠事件发布、指标存储、最新/历史查询和清理 | 否 |
 | MVP-11 | `alert-service`：通过 RabbitMQ 幂等消费指标事件，完成告警检测、状态迁移、记录和推送 | 否 |
 | MVP-12 | `ssh-service`：SSH 连接测试、SSH 会话、PTY、输入输出和超时 | 否 |
