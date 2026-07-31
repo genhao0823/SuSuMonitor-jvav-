@@ -33,6 +33,8 @@ class OutboxMapperMybatisTests {
                 "org.h2.Driver", "jdbc:h2:mem:outbox_mapper;MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
             statement.execute("DROP TABLE IF EXISTS message_outbox");
+            // H2 无 MySQL 的 UTC_TIMESTAMP()，注册等价函数（返回 UTC 时刻）；库跨用例复用需幂等。
+            statement.execute("CREATE ALIAS IF NOT EXISTS UTC_TIMESTAMP FOR \"com.susumonitor.server.module.metrics.outbox.H2UtcTimestamp.utcTimestamp\"");
             statement.execute("""
                     CREATE TABLE message_outbox (
                         id BIGINT AUTO_INCREMENT PRIMARY KEY,

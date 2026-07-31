@@ -21,9 +21,11 @@
         VALUES (#{outbox.eventId}, #{outbox.eventType}, #{outbox.payload},
             #{outbox.status}, #{outbox.attempts}, #{outbox.nextAttemptAt})
     </insert>
+    <!-- 应用写入的 next_attempt_at 为 UTC（Clock.systemUTC），必须与 UTC_TIMESTAMP() 比较，
+         否则会话时区（如 Asia/Shanghai）会造成 8 小时偏差，退避永不生效。 -->
     <select id="selectPendingForPublish" resultMap="OutboxResultMap">
         SELECT <include refid="OutboxColumns"/> FROM message_outbox
-        WHERE status = 'pending' AND next_attempt_at &lt;= NOW()
+        WHERE status = 'pending' AND next_attempt_at &lt;= UTC_TIMESTAMP()
         ORDER BY id ASC
         LIMIT #{limit}
         FOR UPDATE SKIP LOCKED
