@@ -38,6 +38,7 @@ import com.susumonitor.server.module.server.vo.SshHostKeyVo;
 import com.susumonitor.server.module.server.vo.SshTestVo;
 import com.susumonitor.server.security.JwtTokenService;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
+import com.susumonitor.server.module.alert.consume.ConsumeRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
 import com.susumonitor.server.module.terminal.mapper.TerminalSessionMapper;
@@ -139,6 +140,9 @@ class ServerControllerTests {
     private JwtTokenService jwtTokenService;
     @MockitoBean
     private OutboxMapper outboxMapper;
+    @MockitoBean
+    private ConsumeRecordMapper consumeRecordMapper;
+
 
 
     /**

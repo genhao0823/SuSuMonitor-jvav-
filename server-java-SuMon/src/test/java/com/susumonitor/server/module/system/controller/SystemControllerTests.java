@@ -7,6 +7,7 @@ import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
 import com.susumonitor.server.module.metrics.outbox.OutboxMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
+import com.susumonitor.server.module.alert.consume.ConsumeRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
 import com.susumonitor.server.module.system.RabbitHealthChecker;
@@ -92,6 +93,9 @@ class SystemControllerTests {
     // RabbitMQ 探活替身：ready 检查 Broker 分支（enabled=false 时业务 Bean 不存在，仅测试注入 mock）。
     @MockitoBean
     private RabbitHealthChecker rabbitHealthChecker;
+    @MockitoBean
+    private ConsumeRecordMapper consumeRecordMapper;
+
 
     // 条件装配断言：test profile（susumonitor.rabbitmq.enabled=false）下发布器不应加载。
     @Autowired(required = false)

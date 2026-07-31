@@ -30,6 +30,7 @@ import com.susumonitor.server.security.JwtTokenService;
 import com.susumonitor.server.security.SecurityConfig;
 import com.susumonitor.server.security.SecurityErrorHandler;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
+import com.susumonitor.server.module.alert.consume.ConsumeRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
 import com.susumonitor.server.module.terminal.mapper.TerminalSessionMapper;
@@ -106,6 +107,9 @@ class AgentTokenControllerTests {
     private TerminalSessionMapper terminalSessionMapper;
     @MockitoBean
     private OutboxMapper outboxMapper;
+    @MockitoBean
+    private ConsumeRecordMapper consumeRecordMapper;
+
 
 
     /** 验证管理员可注册和轮换 Token，明文仅出现在这两个一次性响应中。 */

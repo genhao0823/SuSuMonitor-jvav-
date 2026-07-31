@@ -29,6 +29,7 @@ import com.susumonitor.server.module.metrics.outbox.OutboxMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
+import com.susumonitor.server.module.alert.consume.ConsumeRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
 import com.susumonitor.server.module.terminal.mapper.TerminalSessionMapper;
@@ -85,6 +86,9 @@ class AlertRuleControllerTests {
     private TerminalSessionMapper terminalSessionMapper;
     @MockitoBean
     private OutboxMapper outboxMapper;
+    @MockitoBean
+    private ConsumeRecordMapper consumeRecordMapper;
+
 
 
     /** admin 创建合法规则应返回 200。 */

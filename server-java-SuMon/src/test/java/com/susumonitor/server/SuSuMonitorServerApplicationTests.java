@@ -7,6 +7,7 @@ import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
 import com.susumonitor.server.module.metrics.outbox.OutboxMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
+import com.susumonitor.server.module.alert.consume.ConsumeRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
 import com.susumonitor.server.module.terminal.mapper.TerminalSessionMapper;
@@ -66,6 +67,9 @@ class SuSuMonitorServerApplicationTests {
     private PlatformTransactionManager transactionManager;
     @MockitoBean
     private OutboxMapper outboxMapper;
+    @MockitoBean
+    private ConsumeRecordMapper consumeRecordMapper;
+
 
 
     @Test

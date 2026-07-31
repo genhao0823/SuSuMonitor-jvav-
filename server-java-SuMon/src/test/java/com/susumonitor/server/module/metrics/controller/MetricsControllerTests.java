@@ -29,6 +29,7 @@ import com.susumonitor.server.security.JwtTokenService;
 import com.susumonitor.server.security.SecurityConfig;
 import com.susumonitor.server.security.SecurityErrorHandler;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
+import com.susumonitor.server.module.alert.consume.ConsumeRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
 import com.susumonitor.server.module.terminal.mapper.TerminalSessionMapper;
@@ -105,6 +106,9 @@ class MetricsControllerTests {
     private TerminalSessionMapper terminalSessionMapper;
     @MockitoBean
     private OutboxMapper outboxMapper;
+    @MockitoBean
+    private ConsumeRecordMapper consumeRecordMapper;
+
 
 
     /** 验证已审核用户可查询最新指标，且响应字段保持 snake_case。 */

@@ -21,6 +21,7 @@ import com.susumonitor.server.common.ErrorCode;
 import com.susumonitor.server.security.AuthenticatedUser;
 import com.susumonitor.server.security.JwtTokenService;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
+import com.susumonitor.server.module.alert.consume.ConsumeRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
 import com.susumonitor.server.module.terminal.mapper.TerminalSessionMapper;
@@ -103,6 +104,9 @@ class AdminUserControllerTests {
     private JwtTokenService jwtTokenService;
     @MockitoBean
     private OutboxMapper outboxMapper;
+    @MockitoBean
+    private ConsumeRecordMapper consumeRecordMapper;
+
 
 
     // 验证管理员可以获取待审核用户列表并返回统一成功响应。
