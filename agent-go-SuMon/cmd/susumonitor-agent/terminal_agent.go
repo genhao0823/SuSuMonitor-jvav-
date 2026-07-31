@@ -46,15 +46,19 @@ func (a *terminalAgent) handle(ctx context.Context, message wsclient.AgentMessag
 	case "terminal.open":
 		var payload wsclient.TerminalOpenPayload
 		if json.Unmarshal(message.Payload, &payload) != nil || !a.matchesServer(payload.ServerID) || payload.SessionID == "" || payload.Cols == 0 || payload.Rows == 0 || payload.Cols > 300 || payload.Rows > 100 {
+			a.logger.Warn("terminal.open rejected: invalid payload or server mismatch", "server_id", payload.ServerID, "session_id", payload.SessionID)
 			a.sendError(ctx, message.MessageID, "", 40003, "terminal invalid payload")
 			return
 		}
+		a.logger.Info("terminal.open received", "session_id", payload.SessionID, "cols", payload.Cols, "rows", payload.Rows)
 		a.requestIDs.Store(payload.SessionID, message.MessageID)
 		if err := a.manager.Open(ctx, payload.SessionID, payload.Cols, payload.Rows); err != nil {
+			a.logger.Warn("terminal pty open failed", "error", err, "session_id", payload.SessionID)
 			a.requestIDs.Delete(payload.SessionID)
 			a.sendError(ctx, message.MessageID, payload.SessionID, 40903, "terminal session state conflict")
 			return
 		}
+		a.logger.Info("terminal.opened sending", "session_id", payload.SessionID)
 		if err := a.send(ctx, wsclient.NewMessageWithID("terminal.opened", message.MessageID,
 			wsclient.TerminalOpenedPayload{ServerID: a.serverID, SessionID: payload.SessionID,
 				Shell: shellIdentifier(a.shell)})); err != nil {
