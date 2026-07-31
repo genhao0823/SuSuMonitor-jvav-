@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.susumonitor.server.module.alert.consume.ConsumeRecordMapper">
+    <resultMap id="ConsumeRecordResultMap" type="com.susumonitor.server.module.alert.consume.ConsumeRecordEntity">
+        <id column="id" property="id"/>
+        <result column="consumer" property="consumer"/>
+        <result column="event_id" property="eventId"/>
+        <result column="status" property="status"/>
+        <result column="attempts" property="attempts"/>
+        <result column="last_error" property="lastError"/>
+        <result column="consumed_at" property="consumedAt"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+    <sql id="ConsumeRecordColumns">id, consumer, event_id, status, attempts, last_error,
+        consumed_at, created_at, updated_at</sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="record.id">
+        INSERT INTO message_consume_records (consumer, event_id, status, attempts, consumed_at)
+        VALUES (#{record.consumer}, #{record.eventId}, #{record.status}, #{record.attempts}, #{record.consumedAt})
+    </insert>
+    <select id="existsConsumed" resultType="boolean">
+        SELECT COUNT(1) > 0 FROM message_consume_records
+        WHERE consumer = #{consumer} AND event_id = #{eventId}
+    </select>
+    <update id="markFailed">
+        UPDATE message_consume_records
+        SET status = 'failed', attempts = #{attempts}, last_error = #{lastError}
+        WHERE id = #{id}
+    </update>
+</mapper>
