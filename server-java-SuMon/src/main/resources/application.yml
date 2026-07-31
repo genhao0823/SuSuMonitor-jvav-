@@ -82,6 +82,14 @@ susumonitor:
     output-burst-bytes: ${TERMINAL_OUTPUT_BURST_BYTES:524288}
     monitor-send-time-limit-millis: ${TERMINAL_MONITOR_SEND_TIME_LIMIT_MILLIS:5000}
     monitor-buffer-size-bytes: ${TERMINAL_MONITOR_BUFFER_SIZE_BYTES:262144}
+  rabbitmq:
+    enabled: ${OUTBOX_ENABLED:true}
+    exchange: ${OUTBOX_EXCHANGE:susumonitor.events}
+    routing-key: ${OUTBOX_ROUTING_KEY:metrics.reported.v1}
+    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
+    batch-size: ${OUTBOX_BATCH_SIZE:100}
+    publish-timeout-ms: ${OUTBOX_PUBLISH_TIMEOUT_MS:5000}
+    max-backoff-seconds: ${OUTBOX_MAX_BACKOFF_SECONDS:300}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
     allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}

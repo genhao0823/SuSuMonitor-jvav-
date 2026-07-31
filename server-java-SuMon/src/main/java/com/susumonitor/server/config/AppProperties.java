@@ -43,6 +43,10 @@ public class AppProperties {
     @Valid
     private final Terminal terminal = new Terminal();
 
+    /** 递归校验 Outbox 发布器与 RabbitMQ 拓扑配置。 */
+    @Valid
+    private final Rabbitmq rabbitmq = new Rabbitmq();
+
     // 递归校验 CORS 允许的前端 Origin 白名单。
     @Valid
     private final Cors cors = new Cors();
@@ -69,6 +73,10 @@ public class AppProperties {
 
     public Terminal getTerminal() {
         return terminal;
+    }
+
+    public Rabbitmq getRabbitmq() {
+        return rabbitmq;
     }
 
     public Cors getCors() {
@@ -504,6 +512,102 @@ public class AppProperties {
         public int getMonitorBufferSizeBytes() { return monitorBufferSizeBytes; }
         /** 设置浏览器 Monitor 会话的待发送缓冲上限。 */
         public void setMonitorBufferSizeBytes(int value) { monitorBufferSizeBytes = value; }
+    }
+
+    /**
+     * Outbox 发布器与 RabbitMQ 拓扑配置（MVP-10）。
+     *
+     * <p>连接参数（host/port/username/password/virtual-host）走标准
+     * {@code spring.rabbitmq.*}，由 spring-boot-starter-amqp 自动配置；
+     * 本嵌套类只承载业务侧参数。enabled=false 时不加载发布器调度、
+     * 拓扑声明与就绪检查（测试与降级场景使用）。</p>
+     */
+    public static class Rabbitmq {
+
+        /** 是否启用 Outbox 发布与 RabbitMQ 就绪检查。 */
+        private boolean enabled = true;
+
+        /** 冻结的 Topic Exchange 名（rabbitmq-topology-v1.md §二）。 */
+        private String exchange = "susumonitor.events";
+
+        /** 冻结的 Routing Key（metrics.reported.v1）。 */
+        private String routingKey = "metrics.reported.v1";
+
+        /** 发布器轮询间隔（毫秒）。 */
+        @Min(value = 100, message = "Outbox poll interval must be at least 100 ms")
+        @Max(value = 60000, message = "Outbox poll interval must not exceed 60000 ms")
+        private long pollIntervalMs = 1000;
+
+        /** 单轮最多选取的待发布行数。 */
+        @Min(value = 1, message = "Outbox batch size must be at least one")
+        @Max(value = 10000, message = "Outbox batch size must not exceed 10000")
+        private int batchSize = 100;
+
+        /** 等待 Broker Confirm 的超时（毫秒）。 */
+        @Min(value = 100, message = "Outbox publish timeout must be at least 100 ms")
+        @Max(value = 60000, message = "Outbox publish timeout must not exceed 60000 ms")
+        private long publishTimeoutMs = 5000;
+
+        /** 指数退避封顶（秒），实际间隔为 min(2^attempts, 该值)。 */
+        @Min(value = 1, message = "Outbox max backoff must be at least one second")
+        @Max(value = 86400, message = "Outbox max backoff must not exceed 86400 seconds")
+        private int maxBackoffSeconds = 300;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getExchange() {
+            return exchange;
+        }
+
+        public void setExchange(String exchange) {
+            this.exchange = exchange;
+        }
+
+        public String getRoutingKey() {
+            return routingKey;
+        }
+
+        public void setRoutingKey(String routingKey) {
+            this.routingKey = routingKey;
+        }
+
+        public long getPollIntervalMs() {
+            return pollIntervalMs;
+        }
+
+        public void setPollIntervalMs(long pollIntervalMs) {
+            this.pollIntervalMs = pollIntervalMs;
+        }
+
+        public int getBatchSize() {
+            return batchSize;
+        }
+
+        public void setBatchSize(int batchSize) {
+            this.batchSize = batchSize;
+        }
+
+        public long getPublishTimeoutMs() {
+            return publishTimeoutMs;
+        }
+
+        public void setPublishTimeoutMs(long publishTimeoutMs) {
+            this.publishTimeoutMs = publishTimeoutMs;
+        }
+
+        public int getMaxBackoffSeconds() {
+            return maxBackoffSeconds;
+        }
+
+        public void setMaxBackoffSeconds(int maxBackoffSeconds) {
+            this.maxBackoffSeconds = maxBackoffSeconds;
+        }
     }
 
     /**
