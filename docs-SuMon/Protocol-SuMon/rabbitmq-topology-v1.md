@@ -115,3 +115,18 @@ MVP-9 只完成文档评审、命名冻结和未来测试设计，不执行真�
 | 时间口径 | 写入 UTC（应用时钟），轮询比较 `UTC_TIMESTAMP()`（修复会话时区偏差，见 Develop-log §三） |
 
 仍属 MVP-11：`susumonitor.alert.metrics` 消费者、ACK/重复消费、重试耗尽进 DLQ、DLQ 查询与受控重放。MVP-10 期间队列消息堆积为预期行为，不视为丢失。
+
+## 九、实现确认（2026-07-31，MVP-11 消费侧落地）
+
+本文档冻结的消费侧语义已由 MVP-11 落地并真实验收（见 `Develop-log/20260731-MVP11-Alert-消费侧.md`）：
+
+| 冻结项 | 实现 |
+|---|---|
+| ACK 语义（§四） | **AUTO 确认模式**：业务事务（评估 + `message_consume_records` 插入）在监听方法内提交后返回，容器随后 ACK；异常不返回不 ACK。等价"业务事务成功才 ACK"（MANUAL + afterCommit 等价方案在真实验收中被弃用，原因见 Develop-log §四） |
+| 重复消费幂等 | `message_consume_records(consumer='alert-evaluator', event_id)` 唯一键 + 消费事务内先查后插；重投递幂等命中零业务效果（真实验收：同 event_id 重投无新记录/无推送） |
+| 重试冻结（§五） | 容器级有限重试：max-attempts=3（`ALERT_CONSUME_MAX_ATTEMPTS` 可覆盖）、退避 1s/×2/上限 10s；`AmqpRejectAndDontRequeueException`（含 cause 链）零重试立即 reject |
+| 重试耗尽 → DLQ | 容器 reject(requeue=false) → `susumonitor.dlx` → `susumonitor.alert.metrics.dlq`（真实验收：非法 JSON + schema_version=2 均入 DLQ） |
+| 业务处理与消费记录原子 | 同一 `TransactionTemplate` 事务提交，评估 + 幂等记录同生共死 |
+| 消费者重启恢复 | 未验证（单消费者当前）；Broker 停机期间 outbox 堆积、恢复后补发补消费（发布侧已验收） |
+
+仍属后续：DLQ 查询与受控重放工具（当前管理 API 手动重投）、多消费者并发消费。

@@ -1,7 +1,7 @@
 # SuSuMonitor RabbitMQ 运维手册（MVP-8）
 
-**适用范围**：MVP-10 Outbox 引入的 RabbitMQ 依赖的日常运维。
-**相关**：`Develop-log/20260731-MVP10-Metrics-Outbox.md`（实施与验收）、`docs-SuMon/Protocol-SuMon/rabbitmq-topology-v1.md`（冻结拓扑）。
+**适用范围**：MVP-10 Outbox 引入 + MVP-11 消费侧的 RabbitMQ 依赖的日常运维。
+**相关**：`Develop-log/20260731-MVP10-Metrics-Outbox.md`、`Develop-log/20260731-MVP11-Alert-消费侧.md`（实施与验收）、`docs-SuMon/Protocol-SuMon/rabbitmq-topology-v1.md`（冻结拓扑）。
 
 ---
 
@@ -12,11 +12,13 @@ Agent 上报 metrics.report
   -> MySQL 事务：指标落库 + message_outbox(pending) 同事务写入
   -> OutboxPublisherScheduler（1s 轮询，FOR UPDATE SKIP LOCKED）
   -> Publisher Confirm 投递到 susumonitor.events
-  -> susumonitor.alert.metrics 队列（MVP-11 接入消费者；当前堆积为预期）
+  -> susumonitor.alert.metrics 队列
+  -> AlertMessageConsumer（AUTO 确认 + 幂等 + 有限重试；不可重试/重试耗尽 -> DLQ）
 ```
 
-- RabbitMQ 只承载 **metrics.reported.v1 事件投递**；Agent/Monitor WebSocket、MySQL、SSH/终端链路均不经过它。
-- **Broker 停机不影响指标采集与落库**，只影响事件投递（outbox 退避堆积，恢复后自动补发）。
+- RabbitMQ 承载 **metrics.reported.v1 事件投递**；Agent/Monitor WebSocket、MySQL、SSH/终端链路均不经过它。
+- **Broker 停机不影响指标采集与落库**，只影响事件投递（outbox 退避堆积，恢复后自动补发补消费）；**告警评估依赖 Broker**——停机期间告警延迟评估，恢复后补消费（有界，不丢）。
+- 消费侧：业务队列消息应**接近 0**（消费即 ACK）；异常消息进入 `susumonitor.alert.metrics.dlq`。
 
 ## 二、vhost / 用户 / 权限管理
 
@@ -64,7 +66,8 @@ rabbitmqctl list_exchanges -p susumonitor name type durable
 | 项 | 方式 | 说明 |
 |---|---|---|
 | 后端视角 | `GET /api/ready` | DB + RabbitMQ 双检查；Broker 不可达返回 **HTTP 503 / 50301 "rabbitmq unavailable"**（存活但未就绪，应用不退出） |
-| 积压监控 | `rabbitmqctl list_queues -p susumonitor name messages` | `susumonitor.alert.metrics` 消息数 = 待 MVP-11 消费的堆积量（当前增长属预期）；**异常突增**（发布速率远高于指标速率）需排查 |
+| 积压监控 | `rabbitmqctl list_queues -p susumonitor name messages` | `susumonitor.alert.metrics` 正常应接近 0（消费即 ACK）；**持续增长**说明消费者未运行或评估失败（查后端日志与 DLQ）；`susumonitor.alert.metrics.dlq` 增长 = 数据错误或重试耗尽，需人工介入 |
+| 死信处置 | 管理台/管理 API 查看 `susumonitor.alert.metrics.dlq` | 按错误分类：不可重试（非法 JSON / schema 不符，契约数据错误）修数据后重投或丢弃；可重试耗尽（DB 故障遗留）排查根因后**受控重放**（当前无工具，用管理 API `POST /api/queues/.../get` 取出后重新 publish 到 `susumonitor.events`） |
 | 管理台 | http://127.0.0.1:15672（仅内网） | 队列/连接/节点监控 |
 | Broker 状态 | `rabbitmqctl status` | 节点/版本/Erlang 版本 |
 
@@ -72,8 +75,8 @@ rabbitmqctl list_exchanges -p susumonitor name type durable
 
 | 场景 | 影响 | 恢复行为 |
 |---|---|---|
-| Broker 停机 | 指标照常落库；outbox 事件退避堆积（指数退避封顶 300s）；`/api/ready` 50301 | Broker 恢复后发布器**自动补发**，无需人工干预（MVP-10 三阶段验收 PASS 证据） |
-| Broker 数据目录损坏 | 消息丢失（业务队列堆积的事件）；**指标数据不受影响**（已落 MySQL） | 重建 broker → 拓扑自动声明 → 后续事件正常投递；丢失的堆积事件需接受（消费侧未启动前无业务损失） |
+| Broker 停机 | 指标照常落库；outbox 事件退避堆积（指数退避封顶 300s）；`/api/ready` 50301；**告警评估暂停**（消费侧无消息可消费） | Broker 恢复后发布器**自动补发**，消费者自动补消费并评估（MVP-10 三阶段 + MVP-11 验收 PASS 证据），无需人工干预 |
+| Broker 数据目录损坏 | 消息丢失（队列中未消费事件）；**指标数据不受影响**（已落 MySQL） | 重建 broker → 拓扑自动声明 → 后续事件正常投递；丢失的队列事件需接受（已评估过的无损失；未评估的指标数据仍在 MySQL，可后续重放或接受） |
 | 后端重启 | 无影响 | 发布器随应用恢复轮询；Broker 侧连接自动重连 |
 
 ## 六、生产部署建议

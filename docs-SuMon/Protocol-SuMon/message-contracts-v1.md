@@ -136,3 +136,14 @@
 - 真实 Broker 验收已核对出队消息与本文契约一致（verify-outbox.mjs）。
 
 仍属 MVP-11：JSON Schema 运行校验、`message_consume_records`、消费幂等与 DLQ 分类执行。
+
+## 八、实现确认（2026-07-31，MVP-11 消费侧落地）
+
+消费侧已按本文契约解析并验收（见 `Develop-log/20260731-MVP11-Alert-消费侧.md`）：
+
+- `MetricsReportedMessage` record 反序列化：信封字段 snake_case 与 §三 示例逐字段一致（含 `producer=metrics-service` 断言）。
+- 契约常量 `EVENT_TYPE`/`SCHEMA_VERSION` 由 `OutboxEnvelopeFactory` 公开，发布/消费两侧同一来源，杜绝硬编码漂移。
+- 不可重试数据错误分类执行（§五）：JSON 无法解析、`schema_version≠1`、`event_type` 不符 → `AmqpRejectAndDontRequeueException` → 零重试进 DLQ（真实验收 C3）。
+- `message_consume_records` 落地（V15）：consumer+event_id 唯一键，消费幂等（真实验收：同 event_id 重投仅 1 行记录、无第二次业务效果）。
+- 时间口径：`occurred_at`/`collected_at` 解析沿用 UTC 秒级格式，消费记录 `consumed_at` 写入 UTC（应用时钟）。
+- JSON Schema 运行校验仍未引入（当前以字段级反序列化 + schema_version/event_type 校验覆盖不可重试分类；缺字段等畸形载荷会被拒绝进 DLQ）。
