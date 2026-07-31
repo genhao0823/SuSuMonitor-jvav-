@@ -1,7 +1,6 @@
 package com.susumonitor.server.module.alert.consume;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rabbitmq.client.Channel;
 import com.susumonitor.server.module.alert.service.AlertEvaluationService;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -15,14 +14,10 @@ import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.transaction.TransactionStatus;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -34,10 +29,9 @@ import static org.mockito.Mockito.when;
 /**
  * AlertMessageConsumer 单元测试（全 mock，不依赖 Broker/DB）。
  *
- * <p>事务同步生命周期由测试驱动：在回调内注册同步，回调后触发
- * afterCommit——模拟真实事务管理器提交后调用，验证"业务成功才 ACK"语义。</p>
+ * <p>AUTO 确认模式下 ACK 由容器在监听方法正常返回后执行，本测试只断言
+ * 业务行为（评估调用 / 幂等记录插入 / 不可重试异常分类）。</p>
  */
-@SuppressWarnings("unchecked")
 class AlertMessageConsumerTests {
 
     private static final String EVENT_ID = "evt-20260731-0001";
@@ -50,8 +44,6 @@ class AlertMessageConsumerTests {
 
     private TransactionTemplate transactionTemplate;
 
-    private Channel channel;
-
     private AlertMessageConsumer consumer;
 
     @BeforeEach
@@ -59,18 +51,10 @@ class AlertMessageConsumerTests {
         evaluationService = mock(AlertEvaluationService.class);
         consumeRecordMapper = mock(ConsumeRecordMapper.class);
         transactionTemplate = mock(TransactionTemplate.class);
-        channel = mock(Channel.class);
-        // 模拟 TransactionTemplate：执行回调并驱动事务同步生命周期（init -> commit）。
+        // 模拟 TransactionTemplate：直接执行回调（真实事务由 Spring 管理，这里只验证业务调用链）。
         doAnswer(invocation -> {
             java.util.function.Consumer<TransactionStatus> callback = invocation.getArgument(0);
-            TransactionSynchronizationManager.initSynchronization();
-            try {
-                callback.accept(null);
-                TransactionSynchronizationManager.getSynchronizations()
-                        .forEach(TransactionSynchronization::afterCommit);
-            } finally {
-                TransactionSynchronizationManager.clear();
-            }
+            callback.accept(null);
             return null;
         }).when(transactionTemplate).executeWithoutResult(any());
         consumer = new AlertMessageConsumer(objectMapper, evaluationService, consumeRecordMapper,
@@ -78,21 +62,20 @@ class AlertMessageConsumerTests {
     }
 
     @Test
-    void idempotentHitAcksWithoutEvaluationOrInsert() throws Exception {
+    void idempotentHitSkipsEvaluationAndInsert() {
         when(consumeRecordMapper.existsConsumed(AlertMessageConsumer.CONSUMER_NAME, EVENT_ID)).thenReturn(true);
 
-        consumer.onMessage(envelopeMessage(EVENT_ID, 1), channel, 42L);
+        consumer.onMessage(envelopeMessage(EVENT_ID, 1));
 
-        verify(channel).basicAck(42L, false);
         verify(evaluationService, never()).evaluate(any());
         verify(consumeRecordMapper, never()).insert(any());
     }
 
     @Test
-    void firstConsumeEvaluatesInsertsRecordAndAcksAfterCommit() throws Exception {
+    void firstConsumeEvaluatesAndInsertsRecord() {
         when(consumeRecordMapper.existsConsumed(AlertMessageConsumer.CONSUMER_NAME, EVENT_ID)).thenReturn(false);
 
-        consumer.onMessage(envelopeMessage(EVENT_ID, 1), channel, 7L);
+        consumer.onMessage(envelopeMessage(EVENT_ID, 1));
 
         verify(evaluationService).evaluate(any());
         verify(consumeRecordMapper).insert(org.mockito.ArgumentMatchers.argThat(record ->
@@ -100,42 +83,39 @@ class AlertMessageConsumerTests {
                         && EVENT_ID.equals(record.getEventId())
                         && ConsumeStatus.CONSUMED.ruleValue().equals(record.getStatus())
                         && record.getAttempts() == 0));
-        verify(channel).basicAck(7L, false);
     }
 
     @Test
-    void unparseableBodyRejectsWithoutRequeue() throws Exception {
+    void unparseableBodyRejectsWithoutRequeue() {
         Message message = new Message("not-a-json{{".getBytes(StandardCharsets.UTF_8), new MessageProperties());
 
-        assertThatThrownBy(() -> consumer.onMessage(message, channel, 1L))
+        assertThatThrownBy(() -> consumer.onMessage(message))
                 .isInstanceOf(AmqpRejectAndDontRequeueException.class);
 
         verifyNoInteractions(evaluationService);
-        verify(channel, never()).basicAck(anyLong(), anyBoolean());
+        verify(consumeRecordMapper, never()).insert(any());
     }
 
     @Test
-    void unsupportedSchemaVersionRejectsWithoutRequeue() throws Exception {
+    void unsupportedSchemaVersionRejectsWithoutRequeue() {
         Message message = new Message(envelopeJson(EVENT_ID, 2).getBytes(StandardCharsets.UTF_8),
                 new MessageProperties());
 
-        assertThatThrownBy(() -> consumer.onMessage(message, channel, 1L))
+        assertThatThrownBy(() -> consumer.onMessage(message))
                 .isInstanceOf(AmqpRejectAndDontRequeueException.class);
 
         verifyNoInteractions(evaluationService);
-        verify(channel, never()).basicAck(anyLong(), anyBoolean());
+        verify(consumeRecordMapper, never()).insert(any());
     }
 
     @Test
-    void evaluationExceptionPropagatesWithoutAck() throws Exception {
+    void evaluationExceptionPropagates() {
         when(consumeRecordMapper.existsConsumed(AlertMessageConsumer.CONSUMER_NAME, EVENT_ID)).thenReturn(false);
         doThrow(new RuntimeException("db unavailable")).when(evaluationService).evaluate(any());
 
-        assertThatThrownBy(() -> consumer.onMessage(envelopeMessage(EVENT_ID, 1), channel, 3L))
+        assertThatThrownBy(() -> consumer.onMessage(envelopeMessage(EVENT_ID, 1)))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("db unavailable");
-
-        verify(channel, never()).basicAck(anyLong(), anyBoolean());
     }
 
     private Message envelopeMessage(String eventId, int schemaVersion) {
