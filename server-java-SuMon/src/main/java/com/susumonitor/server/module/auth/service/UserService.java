@@ -2,11 +2,17 @@ package com.susumonitor.server.module.auth.service;
 
 import com.susumonitor.server.module.auth.dto.LoginRequest;
 import com.susumonitor.server.module.auth.dto.RegisterRequest;
+import com.susumonitor.server.module.auth.entity.UserEntity;
 import com.susumonitor.server.module.auth.vo.CurrentUserVo;
 import com.susumonitor.server.module.auth.vo.LoginVo;
+import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 定义认证用例的业务契约，供 HTTP 适配层依赖而不耦合具体实现。
+ *
+ * <p>users 表数据所有权归 auth 模块：管理面（admin）与终端（terminal）等
+ * 模块必须通过本接口访问用户数据，不得直接注入 {@code UserMapper}。</p>
  */
 public interface UserService {
 
@@ -25,4 +31,38 @@ public interface UserService {
      * @return 登录结果
      */
     LoginVo login(LoginRequest request);
+
+    /**
+     * 查询所有待审核用户（管理面审核列表）。
+     *
+     * @return 待审核用户实体列表，由调用方转换为对外 VO
+     */
+    List<UserEntity> listPendingUsers();
+
+    /**
+     * 按 ID 查询用户（管理面审核前置校验用）。
+     *
+     * @param userId 用户 ID
+     * @return 用户实体，不存在时返回 null
+     */
+    UserEntity getReviewUserById(Long userId);
+
+    /**
+     * 更新用户审核状态并记录审核人与审核时间。
+     *
+     * @param userId         被审核用户 ID
+     * @param targetStatus  目标审核状态（approved/rejected）
+     * @param operatorUserId 审核人 ID
+     * @param reviewedAt     审核时间
+     * @return 是否更新成功（0 表示状态已变化或行不存在）
+     */
+    boolean updateReviewStatus(Long userId, String targetStatus, Long operatorUserId, LocalDateTime reviewedAt);
+
+    /**
+     * 判断用户是否为已审核通过的普通用户（终端等能力校验用）。
+     *
+     * @param userId 用户 ID
+     * @return 用户存在且 review_status=approved 时为 true
+     */
+    boolean isApprovedUser(Long userId);
 }

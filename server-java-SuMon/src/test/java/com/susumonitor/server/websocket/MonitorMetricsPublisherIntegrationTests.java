@@ -13,7 +13,7 @@ import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
 import com.susumonitor.server.module.metrics.service.MetricsService;
 import com.susumonitor.server.module.metrics.service.MetricsServiceImpl;
 import com.susumonitor.server.module.server.entity.ServerEntity;
-import com.susumonitor.server.module.server.mapper.ServerMapper;
+import com.susumonitor.server.module.server.service.ServerService;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
@@ -144,12 +144,12 @@ class MonitorMetricsPublisherIntegrationTests {
             return mock(MetricsMapper.class);
         }
 
-        /** 提供 Server Mapper 替身，满足 MetricsService 构造依赖。 */
+        /** 提供 ServerService 替身，满足 MetricsService 构造依赖（servers 表访问走服务契约）。 */
         @Bean
-        ServerMapper serverMapper() {
-            ServerMapper serverMapper = mock(ServerMapper.class);
-            when(serverMapper.selectActiveServerForUpdateById(SERVER_ID)).thenReturn(new ServerEntity());
-            return serverMapper;
+        ServerService serverService() {
+            ServerService serverService = mock(ServerService.class);
+            when(serverService.existsActiveForUpdate(SERVER_ID)).thenReturn(true);
+            return serverService;
         }
 
         /** 提供订阅注册表替身，观察广播是否发生。 */
@@ -166,9 +166,9 @@ class MonitorMetricsPublisherIntegrationTests {
 
         /** 使用 Spring 事件发布器构造受事务代理管理的 MetricsService。 */
         @Bean
-        MetricsService metricsService(MetricsMapper metricsMapper, ServerMapper serverMapper,
+        MetricsService metricsService(MetricsMapper metricsMapper, ServerService serverService,
                 ApplicationEventPublisher eventPublisher) {
-            return new MetricsServiceImpl(metricsMapper, serverMapper, eventPublisher);
+            return new MetricsServiceImpl(metricsMapper, serverService, eventPublisher);
         }
     }
 }

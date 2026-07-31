@@ -10,7 +10,7 @@ import static org.mockito.Mockito.when;
 import com.susumonitor.server.common.BusinessException;
 import com.susumonitor.server.common.ErrorCode;
 import com.susumonitor.server.module.auth.entity.UserEntity;
-import com.susumonitor.server.module.auth.mapper.UserMapper;
+import com.susumonitor.server.module.auth.service.UserService;
 import com.susumonitor.server.module.auth.vo.CurrentUserVo;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,20 +29,20 @@ class AdminUserServiceTests {
 
     // 隔离真实数据库，精确验证审核业务分支。
     @Mock
-    private UserMapper userMapper;
+    private UserService userService;
 
     private AdminUserService adminUserService;
 
     // 在每个测试前创建管理员服务。
     @BeforeEach
     void setUp() {
-        adminUserService = new AdminUserServiceImpl(userMapper);
+        adminUserService = new AdminUserServiceImpl(userService);
     }
 
     // 验证待审核列表返回安全 VO。
     @Test
     void listPendingUsersShouldReturnUsers() {
-        when(userMapper.selectPendingUsers()).thenReturn(List.of(user("pending", "user")));
+        when(userService.listPendingUsers()).thenReturn(List.of(user("pending", "user")));
 
         assertEquals(1, adminUserService.listPendingUsers().size());
     }
@@ -50,8 +50,8 @@ class AdminUserServiceTests {
     // 验证批准用户记录审核状态和时间。
     @Test
     void approvePendingUserShouldSucceed() {
-        when(userMapper.selectReviewUserById(2L)).thenReturn(user("pending", "user"));
-        when(userMapper.updateReviewStatus(any(), anyString(), any(), any())).thenReturn(1);
+        when(userService.getReviewUserById(2L)).thenReturn(user("pending", "user"));
+        when(userService.updateReviewStatus(any(), anyString(), any(), any())).thenReturn(true);
 
         CurrentUserVo result = adminUserService.approveUser(2L, 1L);
 
@@ -62,8 +62,8 @@ class AdminUserServiceTests {
     // 验证拒绝用户返回 rejected。
     @Test
     void rejectPendingUserShouldSucceed() {
-        when(userMapper.selectReviewUserById(2L)).thenReturn(user("pending", "user"));
-        when(userMapper.updateReviewStatus(any(), anyString(), any(), any())).thenReturn(1);
+        when(userService.getReviewUserById(2L)).thenReturn(user("pending", "user"));
+        when(userService.updateReviewStatus(any(), anyString(), any(), any())).thenReturn(true);
 
         assertEquals("rejected", adminUserService.rejectUser(2L, 1L).getReviewStatus());
     }
@@ -71,7 +71,7 @@ class AdminUserServiceTests {
     // 验证不存在目标返回 404。
     @Test
     void missingUserShouldReturnNotFound() {
-        when(userMapper.selectReviewUserById(99L)).thenReturn(null);
+        when(userService.getReviewUserById(99L)).thenReturn(null);
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> adminUserService.approveUser(99L, 1L));
@@ -82,7 +82,7 @@ class AdminUserServiceTests {
     // 验证已审核用户返回冲突。
     @Test
     void reviewedUserShouldReturnConflict() {
-        when(userMapper.selectReviewUserById(2L)).thenReturn(user("approved", "user"));
+        when(userService.getReviewUserById(2L)).thenReturn(user("approved", "user"));
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> adminUserService.rejectUser(2L, 1L));
@@ -93,7 +93,7 @@ class AdminUserServiceTests {
     // 验证管理员目标返回冲突。
     @Test
     void adminTargetShouldReturnConflict() {
-        when(userMapper.selectReviewUserById(2L)).thenReturn(user("pending", "admin"));
+        when(userService.getReviewUserById(2L)).thenReturn(user("pending", "admin"));
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> adminUserService.approveUser(2L, 1L));
@@ -104,8 +104,8 @@ class AdminUserServiceTests {
     // 验证并发条件更新失败返回冲突。
     @Test
     void concurrentUpdateShouldReturnConflict() {
-        when(userMapper.selectReviewUserById(2L)).thenReturn(user("pending", "user"));
-        when(userMapper.updateReviewStatus(any(), anyString(), any(), any())).thenReturn(0);
+        when(userService.getReviewUserById(2L)).thenReturn(user("pending", "user"));
+        when(userService.updateReviewStatus(any(), anyString(), any(), any())).thenReturn(false);
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> adminUserService.approveUser(2L, 1L));

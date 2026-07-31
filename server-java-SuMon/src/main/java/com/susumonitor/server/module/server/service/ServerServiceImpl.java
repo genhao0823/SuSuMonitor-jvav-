@@ -35,6 +35,7 @@ public class ServerServiceImpl implements ServerService {
     private static final String PASSWORD_CREDENTIAL_TYPE = "ssh_password";
     private static final String PRIVATE_KEY_CREDENTIAL_TYPE = "ssh_private_key";
     private static final String PASSPHRASE_CREDENTIAL_TYPE = "ssh_private_key_passphrase";
+    private static final String AGENT_STATUS_ONLINE = "online";
     private static final int MAX_PASSWORD_LENGTH = 1024;
     private static final int MAX_PRIVATE_KEY_LENGTH = 65535;
     private static final int MAX_PASSPHRASE_LENGTH = 1024;
@@ -158,6 +159,40 @@ public class ServerServiceImpl implements ServerService {
         validateServerId(serverId);
         try {
             return serverMapper.selectActiveServerById(serverId) != null;
+        } catch (DataAccessException exception) {
+            throw new BusinessException(ErrorCode.DATABASE_ERROR, exception);
+        }
+    }
+
+    /**
+     * 判断服务器是否存在且未被软删除（FOR UPDATE 行锁语义）。
+     *
+     * <p>供指标接收等跨模块强一致校验使用：在调用方事务内锁定服务器行，
+     * 防止指标写入期间服务器被软删除。锁语义封装在本模块，指标模块不直接访问 Mapper。</p>
+     *
+     * @param serverId 服务器 ID
+     * @return 服务器存在且有效时返回 true
+     */
+    @Override
+    public boolean existsActiveForUpdate(Long serverId) {
+        try {
+            return serverMapper.selectActiveServerForUpdateById(serverId) != null;
+        } catch (DataAccessException exception) {
+            throw new BusinessException(ErrorCode.DATABASE_ERROR, exception);
+        }
+    }
+
+    /**
+     * 判断服务器是否存在且 Agent 在线，供终端等跨模块能力校验使用。
+     *
+     * @param serverId 服务器 ID
+     * @return 服务器存在且 agent_status=online 时返回 true
+     */
+    @Override
+    public boolean isAgentOnline(Long serverId) {
+        try {
+            ServerEntity server = serverMapper.selectActiveServerStatusById(serverId);
+            return server != null && AGENT_STATUS_ONLINE.equals(server.getAgentStatus());
         } catch (DataAccessException exception) {
             throw new BusinessException(ErrorCode.DATABASE_ERROR, exception);
         }

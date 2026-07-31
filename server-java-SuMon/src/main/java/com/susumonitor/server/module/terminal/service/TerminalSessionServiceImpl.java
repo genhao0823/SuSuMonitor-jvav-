@@ -3,10 +3,8 @@ package com.susumonitor.server.module.terminal.service;
 import com.susumonitor.server.common.BusinessException;
 import com.susumonitor.server.common.ErrorCode;
 import com.susumonitor.server.config.AppProperties;
-import com.susumonitor.server.module.auth.entity.UserEntity;
-import com.susumonitor.server.module.auth.mapper.UserMapper;
-import com.susumonitor.server.module.server.entity.ServerEntity;
-import com.susumonitor.server.module.server.mapper.ServerMapper;
+import com.susumonitor.server.module.auth.service.UserService;
+import com.susumonitor.server.module.server.service.ServerService;
 import com.susumonitor.server.module.terminal.entity.TerminalSessionEntity;
 import com.susumonitor.server.module.terminal.enums.TerminalSessionStatus;
 import com.susumonitor.server.module.terminal.mapper.TerminalSessionMapper;
@@ -25,18 +23,19 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 public class TerminalSessionServiceImpl implements TerminalSessionService {
     private final TerminalSessionMapper sessionMapper;
-    private final UserMapper userMapper;
-    private final ServerMapper serverMapper;
+    // users/servers 表数据所有权分别在 auth/server 模块，校验统一走 Service 契约。
+    private final UserService userService;
+    private final ServerService serverService;
     private final AppProperties properties;
     private final Clock clock;
     private final ReentrantLock globalQuotaLock = new ReentrantLock();
     private final ConcurrentHashMap<String, ReentrantLock> quotaLocks = new ConcurrentHashMap<>();
 
-    public TerminalSessionServiceImpl(TerminalSessionMapper sessionMapper, UserMapper userMapper,
-            ServerMapper serverMapper, AppProperties properties, Clock clock) {
+    public TerminalSessionServiceImpl(TerminalSessionMapper sessionMapper, UserService userService,
+            ServerService serverService, AppProperties properties, Clock clock) {
         this.sessionMapper = sessionMapper;
-        this.userMapper = userMapper;
-        this.serverMapper = serverMapper;
+        this.userService = userService;
+        this.serverService = serverService;
         this.properties = properties;
         this.clock = clock;
     }
@@ -65,15 +64,13 @@ public class TerminalSessionServiceImpl implements TerminalSessionService {
         if (existing != null) {
             return existing;
         }
-        UserEntity user = userMapper.selectAuthenticationUserById(userId);
-        if (user == null || !"approved".equals(user.getReviewStatus())) {
+        if (!userService.isApprovedUser(userId)) {
             throw new BusinessException(ErrorCode.TERMINAL_ACCESS_DENIED);
         }
-        ServerEntity server = serverMapper.selectActiveServerStatusById(serverId);
-        if (server == null) {
+        if (!serverService.existsActive(serverId)) {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
         }
-        if (!"online".equals(server.getAgentStatus())) {
+        if (!serverService.isAgentOnline(serverId)) {
             throw new BusinessException(ErrorCode.TERMINAL_AGENT_OFFLINE);
         }
         enforceLimits(userId, serverId);
@@ -121,8 +118,7 @@ public class TerminalSessionServiceImpl implements TerminalSessionService {
     /** {@inheritDoc} */
     @Override
     public TerminalSessionEntity requireActiveSession(Long userId, String sessionId) {
-        UserEntity user = userMapper.selectAuthenticationUserById(userId);
-        if (user == null || !"approved".equals(user.getReviewStatus())) {
+        if (!userService.isApprovedUser(userId)) {
             throw new BusinessException(ErrorCode.TERMINAL_ACCESS_DENIED);
         }
         TerminalSessionEntity session = sessionMapper.selectBySessionId(sessionId);

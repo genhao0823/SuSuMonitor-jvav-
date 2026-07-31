@@ -4,7 +4,7 @@ import com.susumonitor.server.common.BusinessException;
 import com.susumonitor.server.common.ErrorCode;
 import com.susumonitor.server.module.admin.vo.PendingUserVo;
 import com.susumonitor.server.module.auth.entity.UserEntity;
-import com.susumonitor.server.module.auth.mapper.UserMapper;
+import com.susumonitor.server.module.auth.service.UserService;
 import com.susumonitor.server.module.auth.vo.CurrentUserVo;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -31,11 +31,12 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     private static final ZoneId APPLICATION_ZONE = ZoneOffset.UTC;
 
-    private final UserMapper userMapper;
+    // users 表数据所有权归 auth 模块，审核数据访问统一走 UserService 契约。
+    private final UserService userService;
 
     // 查询所有待审核用户，并按创建时间升序返回给管理员。
     public List<PendingUserVo> listPendingUsers() {
-        return userMapper.selectPendingUsers().stream().map(this::toPendingUserVo).toList();
+        return userService.listPendingUsers().stream().map(this::toPendingUserVo).toList();
     }
 
     // 将指定待审核用户标记为已审核状态，并记录审核人和审核时间。
@@ -55,7 +56,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         if (operatorUserId == null || operatorUserId <= 0) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
-        UserEntity userEntity = userMapper.selectReviewUserById(userId);
+        UserEntity userEntity = userService.getReviewUserById(userId);
         if (userEntity == null) {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
         }
@@ -63,7 +64,7 @@ public class AdminUserServiceImpl implements AdminUserService {
             throw new BusinessException(ErrorCode.RESOURCE_CONFLICT);
         }
         LocalDateTime reviewedAt = LocalDateTime.now(ZoneOffset.UTC);
-        if (userMapper.updateReviewStatus(userId, targetStatus, operatorUserId, reviewedAt) != 1) {
+        if (!userService.updateReviewStatus(userId, targetStatus, operatorUserId, reviewedAt)) {
             throw new BusinessException(ErrorCode.RESOURCE_CONFLICT);
         }
         userEntity.setReviewStatus(targetStatus);

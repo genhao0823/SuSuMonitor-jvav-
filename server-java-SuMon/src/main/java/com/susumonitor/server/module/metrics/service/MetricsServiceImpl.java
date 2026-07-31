@@ -9,7 +9,7 @@ import com.susumonitor.server.module.metrics.entity.MetricsIngestionEntity;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
 import com.susumonitor.server.module.metrics.vo.MetricsHistoryVo;
 import com.susumonitor.server.module.metrics.vo.MetricsLatestVo;
-import com.susumonitor.server.module.server.mapper.ServerMapper;
+import com.susumonitor.server.module.server.service.ServerService;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -30,14 +30,14 @@ public class MetricsServiceImpl implements MetricsService {
     private static final int MAX_HISTORY_DAYS = 7;
     private static final ZoneId APPLICATION_ZONE = ZoneOffset.UTC;
     private final MetricsMapper metricsMapper;
-    private final ServerMapper serverMapper;
+    private final ServerService serverService;
     private final ApplicationEventPublisher eventPublisher;
 
-    /** 注入 Metrics 和服务器数据访问组件。 */
-    public MetricsServiceImpl(MetricsMapper metricsMapper, ServerMapper serverMapper,
+    /** 注入指标数据访问组件和服务器契约（servers 表访问统一走 ServerService）。 */
+    public MetricsServiceImpl(MetricsMapper metricsMapper, ServerService serverService,
             ApplicationEventPublisher eventPublisher) {
         this.metricsMapper = metricsMapper;
-        this.serverMapper = serverMapper;
+        this.serverService = serverService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -51,7 +51,7 @@ public class MetricsServiceImpl implements MetricsService {
     @Transactional
     public void report(Long authenticatedServerId, String messageId, MetricsReportPayload payload) {
         validatePayload(authenticatedServerId, messageId, payload);
-        if (serverMapper.selectActiveServerForUpdateById(authenticatedServerId) == null) {
+        if (!serverService.existsActiveForUpdate(authenticatedServerId)) {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
         }
         if (isDuplicateIngestion(authenticatedServerId, messageId, payload.getCollectedAt())) {
@@ -103,7 +103,7 @@ public class MetricsServiceImpl implements MetricsService {
     }
 
     private void ensureServerExists(Long serverId) {
-        if (serverId == null || serverId <= 0 || serverMapper.selectActiveServerById(serverId) == null) {
+        if (serverId == null || serverId <= 0 || !serverService.existsActive(serverId)) {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
         }
     }

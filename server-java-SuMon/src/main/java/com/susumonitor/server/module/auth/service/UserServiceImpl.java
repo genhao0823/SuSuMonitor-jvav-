@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.List;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -47,6 +48,53 @@ public class UserServiceImpl implements UserService {
     private final JwtTokenService jwtTokenService;
 
     private final String dummyPasswordHash;
+
+    /**
+     * 查询所有待审核用户（users 表所有权契约，管理面通过本接口访问）。
+     *
+     * @return 待审核用户实体列表
+     */
+    @Override
+    public List<UserEntity> listPendingUsers() {
+        return userMapper.selectPendingUsers();
+    }
+
+    /**
+     * 按 ID 查询用户，供管理面审核前置校验使用。
+     *
+     * @param userId 用户 ID
+     * @return 用户实体，不存在时返回 null
+     */
+    @Override
+    public UserEntity getReviewUserById(Long userId) {
+        return userMapper.selectReviewUserById(userId);
+    }
+
+    /**
+     * 更新用户审核状态，0 行表示状态已变化或行不存在。
+     *
+     * @param userId          被审核用户 ID
+     * @param targetStatus    目标审核状态
+     * @param operatorUserId  审核人 ID
+     * @param reviewedAt      审核时间
+     * @return 是否更新成功
+     */
+    @Override
+    public boolean updateReviewStatus(Long userId, String targetStatus, Long operatorUserId, LocalDateTime reviewedAt) {
+        return userMapper.updateReviewStatus(userId, targetStatus, operatorUserId, reviewedAt) == 1;
+    }
+
+    /**
+     * 判断用户是否已审核通过（终端等跨模块能力校验用）。
+     *
+     * @param userId 用户 ID
+     * @return 用户存在且 review_status=approved 时为 true
+     */
+    @Override
+    public boolean isApprovedUser(Long userId) {
+        UserEntity user = userMapper.selectAuthenticationUserById(userId);
+        return user != null && APPROVED_STATUS.equals(user.getReviewStatus());
+    }
 
     /**
      * 注入用户服务依赖，并创建仅用于统一不存在用户登录耗时的虚拟 BCrypt 哈希。

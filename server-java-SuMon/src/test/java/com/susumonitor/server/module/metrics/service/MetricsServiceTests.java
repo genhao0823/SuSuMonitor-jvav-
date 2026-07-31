@@ -13,7 +13,7 @@ import com.susumonitor.server.common.ErrorCode;
 import com.susumonitor.server.module.metrics.dto.MetricsReportPayload;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
 import com.susumonitor.server.module.server.entity.ServerEntity;
-import com.susumonitor.server.module.server.mapper.ServerMapper;
+import com.susumonitor.server.module.server.service.ServerService;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -39,7 +39,7 @@ class MetricsServiceTests {
     private MetricsMapper metricsMapper;
 
     @Mock
-    private ServerMapper serverMapper;
+    private ServerService serverService;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -49,7 +49,7 @@ class MetricsServiceTests {
     /** 创建每个用例独立的 Service，并默认模拟已锁定的有效服务器行。 */
     @BeforeEach
     void setUp() {
-        service = new MetricsServiceImpl(metricsMapper, serverMapper, eventPublisher);
+        service = new MetricsServiceImpl(metricsMapper, serverService, eventPublisher);
     }
 
     /** 首次投递写入去重记录和指标，并发布一次 Metrics 事件。 */
@@ -128,7 +128,7 @@ class MetricsServiceTests {
     void missingMessageIdShouldBeRejectedBeforeDatabaseAccess() {
         assertThrows(BusinessException.class, () -> service.report(SERVER_ID, null, payload(COLLECTED_AT)));
 
-        verify(serverMapper, never()).selectActiveServerForUpdateById(eq(SERVER_ID));
+        verify(serverService, never()).existsActiveForUpdate(eq(SERVER_ID));
         verify(metricsMapper, never()).insertIngestion(any());
     }
 
@@ -143,6 +143,6 @@ class MetricsServiceTests {
 
     /** 模拟数据库已锁定目标服务器，隔离本类对指标有序写入规则的验证。 */
     private void lockActiveServer() {
-        when(serverMapper.selectActiveServerForUpdateById(SERVER_ID)).thenReturn(new ServerEntity());
+        when(serverService.existsActiveForUpdate(SERVER_ID)).thenReturn(true);
     }
 }

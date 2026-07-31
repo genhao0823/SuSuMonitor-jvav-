@@ -11,9 +11,9 @@ import com.susumonitor.server.common.BusinessException;
 import com.susumonitor.server.common.ErrorCode;
 import com.susumonitor.server.config.AppProperties;
 import com.susumonitor.server.module.auth.entity.UserEntity;
-import com.susumonitor.server.module.auth.mapper.UserMapper;
+import com.susumonitor.server.module.auth.service.UserService;
 import com.susumonitor.server.module.server.entity.ServerEntity;
-import com.susumonitor.server.module.server.mapper.ServerMapper;
+import com.susumonitor.server.module.server.service.ServerService;
 import com.susumonitor.server.module.terminal.entity.TerminalSessionEntity;
 import com.susumonitor.server.module.terminal.enums.TerminalSessionStatus;
 import com.susumonitor.server.module.terminal.mapper.TerminalSessionMapper;
@@ -34,22 +34,23 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class TerminalSessionServiceTests {
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-07-26T00:00:00Z"), ZoneOffset.UTC);
     @Mock private TerminalSessionMapper sessionMapper;
-    @Mock private UserMapper userMapper;
-    @Mock private ServerMapper serverMapper;
+    @Mock private UserService userService;
+    @Mock private ServerService serverService;
     private TerminalSessionService service;
 
     /** 创建使用固定时钟和默认资源限制的服务。 */
     @BeforeEach
     void setUp() {
         AppProperties properties = new AppProperties();
-        service = new TerminalSessionServiceImpl(sessionMapper, userMapper, serverMapper, properties, CLOCK);
+        service = new TerminalSessionServiceImpl(sessionMapper, userService, serverService, properties, CLOCK);
     }
 
     /** 已审核用户和在线 Agent 可创建 opening 会话。 */
     @Test
     void openSessionShouldPersistOpeningMetadata() {
-        when(userMapper.selectAuthenticationUserById(1L)).thenReturn(approvedUser());
-        when(serverMapper.selectActiveServerStatusById(2L)).thenReturn(onlineServer());
+        when(userService.isApprovedUser(1L)).thenReturn(true);
+        when(serverService.existsActive(2L)).thenReturn(true);
+        when(serverService.isAgentOnline(2L)).thenReturn(true);
         stubNoActiveSessions();
 
         TerminalSessionEntity result = service.openSession(1L, 2L, "5e6b9558-9bf1-4b0b-8b93-99fce56f9d19");
@@ -76,7 +77,7 @@ class TerminalSessionServiceTests {
     void openSessionShouldRejectUnapprovedUser() {
         UserEntity user = approvedUser();
         user.setReviewStatus("pending");
-        when(userMapper.selectAuthenticationUserById(1L)).thenReturn(user);
+        when(userService.isApprovedUser(1L)).thenReturn(false);
 
         assertError(ErrorCode.TERMINAL_ACCESS_DENIED,
                 () -> service.openSession(1L, 2L, "message-id"));
@@ -87,8 +88,9 @@ class TerminalSessionServiceTests {
     void openSessionShouldRejectOfflineAgent() {
         ServerEntity server = onlineServer();
         server.setAgentStatus("offline");
-        when(userMapper.selectAuthenticationUserById(1L)).thenReturn(approvedUser());
-        when(serverMapper.selectActiveServerStatusById(2L)).thenReturn(server);
+        when(userService.isApprovedUser(1L)).thenReturn(true);
+        when(serverService.existsActive(2L)).thenReturn(true);
+        when(serverService.isAgentOnline(2L)).thenReturn(false);
 
         assertError(ErrorCode.TERMINAL_AGENT_OFFLINE,
                 () -> service.openSession(1L, 2L, "message-id"));
@@ -97,8 +99,9 @@ class TerminalSessionServiceTests {
     /** 已达到用户会话额度时拒绝创建。 */
     @Test
     void openSessionShouldEnforceUserLimit() {
-        when(userMapper.selectAuthenticationUserById(1L)).thenReturn(approvedUser());
-        when(serverMapper.selectActiveServerStatusById(2L)).thenReturn(onlineServer());
+        when(userService.isApprovedUser(1L)).thenReturn(true);
+        when(serverService.existsActive(2L)).thenReturn(true);
+        when(serverService.isAgentOnline(2L)).thenReturn(true);
         when(sessionMapper.selectActiveByUserId(1L)).thenReturn(List.of(new TerminalSessionEntity(), new TerminalSessionEntity()));
 
         assertError(ErrorCode.TERMINAL_SESSION_LIMIT_REACHED,
