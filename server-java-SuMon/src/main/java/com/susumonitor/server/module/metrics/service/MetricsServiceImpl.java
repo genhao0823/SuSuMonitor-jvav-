@@ -7,6 +7,7 @@ import com.susumonitor.server.module.metrics.dto.MetricsReportPayload;
 import com.susumonitor.server.module.metrics.entity.MetricsEntity;
 import com.susumonitor.server.module.metrics.entity.MetricsIngestionEntity;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
+import com.susumonitor.server.module.metrics.outbox.OutboxService;
 import com.susumonitor.server.module.metrics.vo.MetricsHistoryVo;
 import com.susumonitor.server.module.metrics.vo.MetricsLatestVo;
 import com.susumonitor.server.module.server.service.ServerService;
@@ -31,13 +32,15 @@ public class MetricsServiceImpl implements MetricsService {
     private static final ZoneId APPLICATION_ZONE = ZoneOffset.UTC;
     private final MetricsMapper metricsMapper;
     private final ServerService serverService;
+    private final OutboxService outboxService;
     private final ApplicationEventPublisher eventPublisher;
 
-    /** 注入指标数据访问组件和服务器契约（servers 表访问统一走 ServerService）。 */
+    /** 注入指标数据访问组件、服务器契约与 Outbox 登记服务（servers 表访问统一走 ServerService）。 */
     public MetricsServiceImpl(MetricsMapper metricsMapper, ServerService serverService,
-            ApplicationEventPublisher eventPublisher) {
+            OutboxService outboxService, ApplicationEventPublisher eventPublisher) {
         this.metricsMapper = metricsMapper;
         this.serverService = serverService;
+        this.outboxService = outboxService;
         this.eventPublisher = eventPublisher;
     }
 
@@ -47,6 +50,9 @@ public class MetricsServiceImpl implements MetricsService {
      * <p>同一服务器的写入先锁定服务器行，确保重复投递与采样时间判定串行化。
      * 同一 messageId 重复投递静默成功；采样时间不严格晚于最后接受采样时拒绝，
      * 因而不会触发重复 Metrics 事件、告警评估或 WebSocket 推送。</p>
+     *
+     * <p>指标入库成功后，与指标同事务登记 Outbox 待发布事件（MVP-10）：
+     * 事务回滚时 outbox 行一并回滚，保证"已入库指标必有待发布事件"。</p>
      */
     @Transactional
     public void report(Long authenticatedServerId, String messageId, MetricsReportPayload payload) {
@@ -65,6 +71,7 @@ public class MetricsServiceImpl implements MetricsService {
         if (metricsMapper.insertMetric(entity) != 1) {
             throw new BusinessException(ErrorCode.DATABASE_ERROR);
         }
+        outboxService.enqueue(entity, messageId);
         eventPublisher.publishEvent(new MetricsReportedEvent(toLatestVo(entity)));
     }
 

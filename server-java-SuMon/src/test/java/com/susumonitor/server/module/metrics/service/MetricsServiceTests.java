@@ -11,7 +11,9 @@ import static org.mockito.Mockito.when;
 import com.susumonitor.server.common.BusinessException;
 import com.susumonitor.server.common.ErrorCode;
 import com.susumonitor.server.module.metrics.dto.MetricsReportPayload;
+import com.susumonitor.server.module.metrics.entity.MetricsEntity;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
+import com.susumonitor.server.module.metrics.outbox.OutboxService;
 import com.susumonitor.server.module.server.entity.ServerEntity;
 import com.susumonitor.server.module.server.service.ServerService;
 import java.math.BigDecimal;
@@ -42,6 +44,9 @@ class MetricsServiceTests {
     private ServerService serverService;
 
     @Mock
+    private OutboxService outboxService;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private MetricsService service;
@@ -49,7 +54,7 @@ class MetricsServiceTests {
     /** 创建每个用例独立的 Service，并默认模拟已锁定的有效服务器行。 */
     @BeforeEach
     void setUp() {
-        service = new MetricsServiceImpl(metricsMapper, serverService, eventPublisher);
+        service = new MetricsServiceImpl(metricsMapper, serverService, outboxService, eventPublisher);
     }
 
     /** 首次投递写入去重记录和指标，并发布一次 Metrics 事件。 */
@@ -65,6 +70,22 @@ class MetricsServiceTests {
         verify(eventPublisher).publishEvent(any(MetricsService.MetricsReportedEvent.class));
     }
 
+    /** 指标入库成功后，应与指标同事务登记 Outbox 待发布事件（MVP-10）。 */
+    @Test
+    void firstReportShouldEnqueueOutboxInSameTransaction() {
+        lockActiveServer();
+        when(metricsMapper.insertIngestion(any())).thenReturn(1);
+        when(metricsMapper.insertMetric(any())).thenReturn(1);
+        String messageId = UUID.randomUUID().toString();
+
+        service.report(SERVER_ID, messageId, payload(COLLECTED_AT));
+
+        org.mockito.ArgumentCaptor<MetricsEntity> captor =
+                org.mockito.ArgumentCaptor.forClass(MetricsEntity.class);
+        verify(outboxService).enqueue(captor.capture(), eq(messageId));
+        org.junit.jupiter.api.Assertions.assertEquals(SERVER_ID, captor.getValue().getServerId());
+    }
+
     /** 相同消息 ID 的数据库唯一键冲突视为成功重试，不再写指标或发布事件。 */
     @Test
     void duplicateMessageIdShouldBeSilentlyIdempotent() {
@@ -76,6 +97,7 @@ class MetricsServiceTests {
         verify(metricsMapper, never()).selectLatestCollectedAt(any());
         verify(metricsMapper, never()).insertMetric(any());
         verify(eventPublisher, never()).publishEvent(any());
+        verify(outboxService, never()).enqueue(any(), any());
     }
 
     /** 与最后接受采样时间相同的不同消息必须拒绝，维持采样时间严格递增。 */
@@ -92,6 +114,7 @@ class MetricsServiceTests {
         org.junit.jupiter.api.Assertions.assertEquals(ErrorCode.INVALID_REQUEST_PARAMETER, exception.getErrorCode());
         verify(metricsMapper, never()).insertMetric(any());
         verify(eventPublisher, never()).publishEvent(any());
+        verify(outboxService, never()).enqueue(any(), any());
     }
 
     /** 早于最后接受采样的消息必须拒绝，不允许旧值回退 latest 和告警状态。 */
@@ -107,6 +130,7 @@ class MetricsServiceTests {
 
         verify(metricsMapper, never()).insertMetric(any());
         verify(eventPublisher, never()).publishEvent(any());
+        verify(outboxService, never()).enqueue(any(), any());
     }
 
     /** 指标写入失败时向上抛出数据库错误；真实事务会同时回滚本次 ingestion 登记。 */

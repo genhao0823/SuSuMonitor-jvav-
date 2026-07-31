@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.susumonitor.server.module.metrics.dto.MetricsReportPayload;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
+import com.susumonitor.server.module.metrics.outbox.OutboxService;
 import com.susumonitor.server.module.metrics.service.MetricsService;
 import com.susumonitor.server.module.metrics.service.MetricsServiceImpl;
 import com.susumonitor.server.module.server.entity.ServerEntity;
@@ -152,6 +153,12 @@ class MonitorMetricsPublisherIntegrationTests {
             return serverService;
         }
 
+        /** 提供 OutboxService 替身，隔离本集成测试与 outbox 写入路径。 */
+        @Bean
+        OutboxService outboxService() {
+            return mock(OutboxService.class);
+        }
+
         /** 提供订阅注册表替身，观察广播是否发生。 */
         @Bean
         MonitorSubscriptionRegistry monitorSubscriptionRegistry() {
@@ -167,8 +174,8 @@ class MonitorMetricsPublisherIntegrationTests {
         /** 使用 Spring 事件发布器构造受事务代理管理的 MetricsService。 */
         @Bean
         MetricsService metricsService(MetricsMapper metricsMapper, ServerService serverService,
-                ApplicationEventPublisher eventPublisher) {
-            return new MetricsServiceImpl(metricsMapper, serverService, eventPublisher);
+                OutboxService outboxService, ApplicationEventPublisher eventPublisher) {
+            return new MetricsServiceImpl(metricsMapper, serverService, outboxService, eventPublisher);
         }
     }
 }
