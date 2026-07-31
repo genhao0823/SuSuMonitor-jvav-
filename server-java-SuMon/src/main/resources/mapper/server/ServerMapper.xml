@@ -306,16 +306,19 @@
     <update id="revokeAgentToken">
         UPDATE servers
         SET agent_token_revoked_at = #{revokedAt},
-            agent_status = 'offline'
+            agent_status = 'offline',
+            status = 'offline'
         WHERE id = #{serverId}
           AND deleted = 0
           AND agent_token_hash IS NOT NULL
           AND agent_token_revoked_at IS NULL
     </update>
 
+    <!-- 心跳/鉴权成功时把 status 同步置为 online,使前端"状态"列与 Agent 在线状态一致。 -->
     <update id="updateAgentHeartbeat">
         UPDATE servers
         SET agent_status = 'online',
+            status = 'online',
             last_heartbeat_at = #{heartbeatAt}
         WHERE id = #{serverId}
           AND deleted = 0
@@ -323,9 +326,11 @@
           AND agent_token_revoked_at IS NULL
     </update>
 
+    <!-- 心跳超时或主动离线时把 status 同步置为 offline。 -->
     <update id="markAgentOffline">
         UPDATE servers
-        SET agent_status = 'offline'
+        SET agent_status = 'offline',
+            status = 'offline'
         WHERE id = #{serverId}
           AND deleted = 0
           AND agent_status = 'online'
