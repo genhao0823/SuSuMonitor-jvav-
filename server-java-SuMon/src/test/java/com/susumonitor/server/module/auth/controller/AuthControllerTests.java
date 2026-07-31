@@ -29,6 +29,7 @@ import com.susumonitor.server.module.auth.vo.CurrentUserVo;
 import com.susumonitor.server.module.auth.vo.LoginVo;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
+import com.susumonitor.server.module.metrics.outbox.OutboxMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
 import com.susumonitor.server.security.JwtTokenService;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
@@ -112,6 +113,9 @@ class AuthControllerTests {
     // 提供 JWT 服务替身，使安全过滤器测试可控制 Token 解析结果。
     @MockitoBean
     private JwtTokenService jwtTokenService;
+    @MockitoBean
+    private OutboxMapper outboxMapper;
+
 
     @Test
     // 验证合法注册请求返回统一成功响应和请求 ID。

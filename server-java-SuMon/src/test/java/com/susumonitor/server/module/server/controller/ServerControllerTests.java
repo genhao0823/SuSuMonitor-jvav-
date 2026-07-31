@@ -28,6 +28,7 @@ import com.susumonitor.server.module.server.dto.ServerQueryRequest;
 import com.susumonitor.server.module.server.dto.UpdateServerRequest;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
+import com.susumonitor.server.module.metrics.outbox.OutboxMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
 import com.susumonitor.server.module.server.service.ServerService;
 import com.susumonitor.server.module.server.service.ServerSshService;
@@ -136,6 +137,9 @@ class ServerControllerTests {
     // 提供 JWT 服务替身，使每个权限场景可控制 Token 解析结果。
     @MockitoBean
     private JwtTokenService jwtTokenService;
+    @MockitoBean
+    private OutboxMapper outboxMapper;
+
 
     /**
      * 验证管理员可成功调用创建、列表、详情、更新、删除和状态六个接口。

@@ -14,6 +14,7 @@ import com.susumonitor.server.module.auth.mapper.UserMapper;
 import com.susumonitor.server.module.auth.vo.CurrentUserVo;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
+import com.susumonitor.server.module.metrics.outbox.OutboxMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
 import com.susumonitor.server.common.BusinessException;
 import com.susumonitor.server.common.ErrorCode;
@@ -100,6 +101,9 @@ class AdminUserControllerTests {
     // 提供 JWT 服务替身，使安全过滤器测试可控制 Token 解析结果。
     @MockitoBean
     private JwtTokenService jwtTokenService;
+    @MockitoBean
+    private OutboxMapper outboxMapper;
+
 
     // 验证管理员可以获取待审核用户列表并返回统一成功响应。
     @Test

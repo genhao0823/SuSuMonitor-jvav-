@@ -22,6 +22,7 @@ import com.susumonitor.server.module.alert.vo.AlertRecordVo;
 import com.susumonitor.server.module.auth.mapper.AuthBootstrapStateMapper;
 import com.susumonitor.server.module.auth.mapper.UserMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
+import com.susumonitor.server.module.metrics.outbox.OutboxMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
@@ -80,6 +81,9 @@ class AlertRecordControllerTests {
     private AlertStateMapper alertStateMapper;
     @MockitoBean
     private TerminalSessionMapper terminalSessionMapper;
+    @MockitoBean
+    private OutboxMapper outboxMapper;
+
 
     /** 分页查询应返回 200 和分页结构。 */
     @Test

@@ -19,6 +19,7 @@ import com.susumonitor.server.module.auth.entity.UserEntity;
 import com.susumonitor.server.module.auth.mapper.AuthBootstrapStateMapper;
 import com.susumonitor.server.module.auth.mapper.UserMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
+import com.susumonitor.server.module.metrics.outbox.OutboxMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
 import com.susumonitor.server.module.metrics.service.MetricsService;
 import com.susumonitor.server.module.metrics.vo.MetricsHistoryVo;
@@ -102,6 +103,9 @@ class MetricsControllerTests {
     // 使用模拟终端 Mapper，避免 V12 Mapper 扫描后创建真实 MyBatis 会话依赖。
     @MockitoBean
     private TerminalSessionMapper terminalSessionMapper;
+    @MockitoBean
+    private OutboxMapper outboxMapper;
+
 
     /** 验证已审核用户可查询最新指标，且响应字段保持 snake_case。 */
     @Test

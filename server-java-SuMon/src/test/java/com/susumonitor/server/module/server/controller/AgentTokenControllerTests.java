@@ -21,6 +21,7 @@ import com.susumonitor.server.module.auth.entity.UserEntity;
 import com.susumonitor.server.module.auth.mapper.AuthBootstrapStateMapper;
 import com.susumonitor.server.module.auth.mapper.UserMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
+import com.susumonitor.server.module.metrics.outbox.OutboxMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import com.susumonitor.server.module.server.service.AgentTokenService;
@@ -103,6 +104,9 @@ class AgentTokenControllerTests {
     // 使用模拟终端 Mapper，避免 V12 Mapper 扫描后创建真实 MyBatis 会话依赖。
     @MockitoBean
     private TerminalSessionMapper terminalSessionMapper;
+    @MockitoBean
+    private OutboxMapper outboxMapper;
+
 
     /** 验证管理员可注册和轮换 Token，明文仅出现在这两个一次性响应中。 */
     @Test

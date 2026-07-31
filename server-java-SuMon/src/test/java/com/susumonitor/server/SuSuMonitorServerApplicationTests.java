@@ -4,6 +4,7 @@ import com.susumonitor.server.module.auth.mapper.AuthBootstrapStateMapper;
 import com.susumonitor.server.module.auth.mapper.UserMapper;
 import com.susumonitor.server.module.server.mapper.ServerMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
+import com.susumonitor.server.module.metrics.outbox.OutboxMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
@@ -63,6 +64,9 @@ class SuSuMonitorServerApplicationTests {
 
     @MockitoBean
     private PlatformTransactionManager transactionManager;
+    @MockitoBean
+    private OutboxMapper outboxMapper;
+
 
     @Test
     void contextLoads() {
