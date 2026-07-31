@@ -7,6 +7,7 @@ import com.susumonitor.server.module.metrics.mapper.MetricsMapper;
 import com.susumonitor.server.module.metrics.outbox.OutboxMapper;
 import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
+import com.susumonitor.server.module.alert.consume.AlertMessageConsumer;
 import com.susumonitor.server.module.alert.consume.ConsumeRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
@@ -188,5 +189,15 @@ class SystemControllerTests {
     @Test
     void outboxPublisherShouldNotLoadWhenDisabled() {
         org.junit.jupiter.api.Assertions.assertNull(outboxPublisherScheduler);
+    }
+
+    // 条件装配断言：test profile（susumonitor.rabbitmq.enabled=false）下消费者不应加载。
+    @Autowired(required = false)
+    private AlertMessageConsumer alertMessageConsumer;
+
+    /** test profile 关闭 RabbitMQ 时消费端不应加载（条件装配）。 */
+    @Test
+    void alertConsumerShouldNotLoadWhenDisabled() {
+        org.junit.jupiter.api.Assertions.assertNull(alertMessageConsumer);
     }
 }

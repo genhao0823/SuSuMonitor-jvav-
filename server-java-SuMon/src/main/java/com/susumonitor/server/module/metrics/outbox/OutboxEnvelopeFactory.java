@@ -19,11 +19,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class OutboxEnvelopeFactory {
 
-    static final String EVENT_TYPE = "metrics.reported";
+    /** 契约事件类型（消费侧校验复用）。 */
+    public static final String EVENT_TYPE = "metrics.reported";
 
     static final String PRODUCER = "metrics-service";
 
-    static final int SCHEMA_VERSION = 1;
+    /** 契约 schema 版本（消费侧校验复用）。 */
+    public static final int SCHEMA_VERSION = 1;
 
     /** 契约时间格式（UTC ISO-8601 固定带秒，与 message-contracts-v1 示例一致）。 */
     private static final DateTimeFormatter CONTRACT_TIMESTAMP =

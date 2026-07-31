@@ -19,6 +19,16 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+  rabbitmq:
+    listener:
+      simple:
+        acknowledge-mode: manual
+        retry:
+          enabled: true
+          max-attempts: ${ALERT_CONSUME_MAX_ATTEMPTS:3}
+          initial-interval: 1000ms
+          multiplier: 2
+          max-interval: 10000ms
 
 server:
   address: ${SERVER_ADDRESS:127.0.0.1}
