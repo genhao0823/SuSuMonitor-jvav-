@@ -9,6 +9,7 @@ import com.susumonitor.server.module.metrics.mapper.MetricsCleanupMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRuleMapper;
 import com.susumonitor.server.module.alert.mapper.AlertRecordMapper;
 import com.susumonitor.server.module.alert.mapper.AlertStateMapper;
+import com.susumonitor.server.module.system.RabbitHealthChecker;
 import com.susumonitor.server.module.terminal.mapper.TerminalSessionMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -88,6 +89,13 @@ class SystemControllerTests {
     @MockitoBean
     private OutboxMapper outboxMapper;
 
+    // RabbitMQ 探活替身：ready 检查 Broker 分支（enabled=false 时业务 Bean 不存在，仅测试注入 mock）。
+    @MockitoBean
+    private RabbitHealthChecker rabbitHealthChecker;
+
+    // 条件装配断言：test profile（susumonitor.rabbitmq.enabled=false）下发布器不应加载。
+    @Autowired(required = false)
+    private com.susumonitor.server.scheduler.OutboxPublisherScheduler outboxPublisherScheduler;
 
     @Test
     void healthShouldReturnSuccessAndRequestId() throws Exception {
@@ -123,6 +131,7 @@ class SystemControllerTests {
     void readyShouldReturnSuccessWhenDatabaseConnectionIsValid() throws Exception {
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.isValid(2)).thenReturn(true);
+        when(rabbitHealthChecker.isHealthy()).thenReturn(true);
 
         mockMvc.perform(get("/api/ready"))
                 .andExpect(status().isOk())
@@ -142,5 +151,38 @@ class SystemControllerTests {
                 .andExpect(header().string("X-Request-ID", not(blankOrNullString())))
                 .andExpect(jsonPath("$.code").value(50001))
                 .andExpect(jsonPath("$.message").value("database error"));
+    }
+
+    /** Broker 可用时 ready 保持成功（存活但未就绪语义的反面）。 */
+    @Test
+    void readyShouldReturnSuccessWhenRabbitMqIsHealthy() throws Exception {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.isValid(2)).thenReturn(true);
+        when(rabbitHealthChecker.isHealthy()).thenReturn(true);
+
+        mockMvc.perform(get("/api/ready"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.status").value("UP"));
+    }
+
+    /** Broker 不可达时 ready 返回 50301（HTTP 503），应用存活不退出。 */
+    @Test
+    void readyShouldReturnServiceUnavailableWhenRabbitMqIsDown() throws Exception {
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.isValid(2)).thenReturn(true);
+        when(rabbitHealthChecker.isHealthy()).thenReturn(false);
+
+        mockMvc.perform(get("/api/ready"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().string("X-Request-ID", not(blankOrNullString())))
+                .andExpect(jsonPath("$.code").value(50301))
+                .andExpect(jsonPath("$.message").value("rabbitmq unavailable"));
+    }
+
+    /** test profile 关闭 Outbox 时发布器不应加载（条件装配）。 */
+    @Test
+    void outboxPublisherShouldNotLoadWhenDisabled() {
+        org.junit.jupiter.api.Assertions.assertNull(outboxPublisherScheduler);
     }
 }

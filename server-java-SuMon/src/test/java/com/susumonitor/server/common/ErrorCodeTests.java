@@ -23,5 +23,8 @@ class ErrorCodeTests {
         assertEquals(HttpStatus.FORBIDDEN, ErrorCode.FORBIDDEN.getHttpStatus());
         assertEquals(40400, ErrorCode.RESOURCE_NOT_FOUND.getCode());
         assertEquals(HttpStatus.NOT_FOUND, ErrorCode.RESOURCE_NOT_FOUND.getHttpStatus());
+        // MVP-10：RabbitMQ 不可达返回 503（存活但未就绪语义）。
+        assertEquals(50301, ErrorCode.RABBITMQ_UNAVAILABLE.getCode());
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.RABBITMQ_UNAVAILABLE.getHttpStatus());
     }
 }
