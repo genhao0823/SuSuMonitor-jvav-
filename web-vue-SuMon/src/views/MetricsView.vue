@@ -47,10 +47,13 @@
         stripe
       >
         <el-table-column
-          prop="collected_at"
           label="采集时间"
           min-width="190"
-        />
+        >
+          <template #default="{ row }">
+            {{ formatDateTime(row.collected_at) }}
+          </template>
+        </el-table-column>
         <el-table-column
           prop="cpu_percent"
           label="CPU %"
@@ -82,6 +85,7 @@ import { useRoute } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import { useMetricsStore } from '@/stores/metrics'
 import { MonitorWebSocket } from '@/services/websocket'
+import { formatDateTime } from '@/utils/format'
 
 const route = useRoute()
 const metrics = useMetricsStore()
