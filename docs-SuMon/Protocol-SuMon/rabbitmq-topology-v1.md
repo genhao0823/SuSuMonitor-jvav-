@@ -127,6 +127,7 @@ MVP-9 只完成文档评审、命名冻结和未来测试设计，不执行真�
 | 重试冻结（§五） | 容器级有限重试：max-attempts=3（`ALERT_CONSUME_MAX_ATTEMPTS` 可覆盖）、退避 1s/×2/上限 10s；`AmqpRejectAndDontRequeueException`（含 cause 链）零重试立即 reject |
 | 重试耗尽 → DLQ | 容器 reject(requeue=false) → `susumonitor.dlx` → `susumonitor.alert.metrics.dlq`（真实验收：非法 JSON + schema_version=2 均入 DLQ） |
 | 业务处理与消费记录原子 | 同一 `TransactionTemplate` 事务提交，评估 + 幂等记录同生共死 |
-| 消费者重启恢复 | 未验证（单消费者当前）；Broker 停机期间 outbox 堆积、恢复后补发补消费（发布侧已验收） |
+| 消费者重启恢复 | **已验收（2026-08-01）**：Broker 停机期间后端存活（health 200 / ready 50301）、指标照常落库 outbox 堆积；恢复后发布器补发 + 消费者**自动重连补消费**（无需重启后端），业务队列归零、状态机正确（continue/resolve/trigger 无重复）；停机消息 6/6 消费无丢失（`verify-mvp11-broker-down.mjs`，见 `Develop-log/20260801-MVP11-收口.md` §三） |
+| DLQ 受控重放 | **已落地（2026-08-01）**：`api-test/replay-dlq.mjs`（--replay 重放 + 防循环提示 / --purge 清空）；合法信封重放幂等命中零业务效果，数据错误消息重放仍回 DLQ |
 
-仍属后续：DLQ 查询与受控重放工具（当前管理 API 手动重投）、多消费者并发消费。
+仍属后续：多消费者并发消费（单消费者当前）。
