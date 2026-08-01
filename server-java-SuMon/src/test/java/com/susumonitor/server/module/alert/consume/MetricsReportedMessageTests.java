@@ -61,7 +61,65 @@ class MetricsReportedMessageTests {
         assertNull(message.payload().loadAvg());
     }
 
-    /** payload 转评估快照：字段映射与 collected_at 解析为 UTC。 */
+    /** 冻结契约示例通过字段级运行校验。 */
+    @Test
+    void contractEnvelopeShouldPassRuntimeValidation() throws Exception {
+        MetricsReportedMessage message = objectMapper.readValue(contractEnvelope(), MetricsReportedMessage.class);
+
+        new MetricsReportedMessageValidator().validate(message);
+    }
+
+    /** 非法 UUID、非 UTC 时间、数值越界与容量不变量冲突应被拒绝。 */
+    @Test
+    void invalidContractFieldsShouldBeRejected() throws Exception {
+        MetricsReportedMessage invalidUuid = objectMapper.readValue(
+                contractEnvelope().replace("9f4c2d10-8b7f-4c3d-a5e0-1ef5b67f2f1a", "not-a-uuid"),
+                MetricsReportedMessage.class);
+        MetricsReportedMessage invalidPercent = objectMapper.readValue(
+                contractEnvelope().replace("\"cpu_percent\": 72.5", "\"cpu_percent\": 100.1"),
+                MetricsReportedMessage.class);
+        MetricsReportedMessage invalidCapacity = objectMapper.readValue(
+                contractEnvelope().replace("\"memory_total\": 2048", "\"memory_total\": 100"),
+                MetricsReportedMessage.class);
+
+        MetricsReportedMessageValidator validator = new MetricsReportedMessageValidator();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> validator.validate(invalidUuid))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> validator.validate(invalidPercent))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> validator.validate(invalidCapacity))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private String contractEnvelope() {
+        return """
+                {
+                  "event_id": "9f4c2d10-8b7f-4c3d-a5e0-1ef5b67f2f1a",
+                  "event_type": "metrics.reported",
+                  "schema_version": 1,
+                  "occurred_at": "2026-07-28T12:00:00Z",
+                  "producer": "metrics-service",
+                  "payload": {
+                    "server_id": 123,
+                    "message_id": "1a08f7b1-51c8-4b46-929a-8879f349a3a2",
+                    "collected_at": "2026-07-28T11:59:58Z",
+                    "cpu_percent": 72.5,
+                    "memory_percent": 61.2,
+                    "memory_used": 1024,
+                    "memory_total": 2048,
+                    "disk_percent": 55.0,
+                    "disk_used": 100,
+                    "disk_total": 200,
+                    "net_rx": 1000,
+                    "net_tx": 800,
+                    "temperature": null,
+                    "load_avg": null
+                  }
+                }
+                """;
+    }
+
+
     @Test
     void payloadShouldConvertToMetricsLatestVo() throws Exception {
         String envelope = """

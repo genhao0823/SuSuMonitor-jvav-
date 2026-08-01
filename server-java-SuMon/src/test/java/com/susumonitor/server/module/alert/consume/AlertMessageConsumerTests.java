@@ -34,7 +34,7 @@ import static org.mockito.Mockito.when;
  */
 class AlertMessageConsumerTests {
 
-    private static final String EVENT_ID = "evt-20260731-0001";
+    private static final String EVENT_ID = "9f4c2d10-8b7f-4c3d-a5e0-1ef5b67f2f1a";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -58,7 +58,8 @@ class AlertMessageConsumerTests {
             return null;
         }).when(transactionTemplate).executeWithoutResult(any());
         consumer = new AlertMessageConsumer(objectMapper, evaluationService, consumeRecordMapper,
-                transactionTemplate, Clock.fixed(Instant.parse("2026-07-31T08:00:00Z"), ZoneOffset.UTC));
+                transactionTemplate, Clock.fixed(Instant.parse("2026-07-31T08:00:00Z"), ZoneOffset.UTC),
+                new MetricsReportedMessageValidator());
     }
 
     @Test
@@ -109,6 +110,45 @@ class AlertMessageConsumerTests {
     }
 
     @Test
+    void invalidEventIdRejectsWithoutCallingBusinessDependencies() {
+        Message message = new Message(envelopeJson("not-a-uuid", 1).getBytes(StandardCharsets.UTF_8),
+                new MessageProperties());
+
+        assertThatThrownBy(() -> consumer.onMessage(message))
+                .isInstanceOf(AmqpRejectAndDontRequeueException.class);
+
+        verifyNoInteractions(consumeRecordMapper, evaluationService);
+    }
+
+    @Test
+    void invalidPayloadValueRejectsWithoutCallingBusinessDependencies() {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("server_id", 1L);
+        payload.put("message_id", "1a08f7b1-51c8-4b46-929a-8879f349a3a2");
+        payload.put("collected_at", "2026-07-31T07:59:59Z");
+        payload.put("cpu_percent", 101);
+        payload.put("memory_percent", 70.1);
+        payload.put("memory_used", 8192L);
+        payload.put("memory_total", 16384L);
+        payload.put("disk_percent", 55.2);
+        payload.put("disk_used", 1024L);
+        payload.put("disk_total", 2048L);
+        payload.put("net_rx", 1000L);
+        payload.put("net_tx", 2000L);
+        Map<String, Object> envelope = new LinkedHashMap<>();
+        envelope.put("event_id", EVENT_ID);
+        envelope.put("event_type", "metrics.reported");
+        envelope.put("schema_version", 1);
+        envelope.put("occurred_at", "2026-07-31T08:00:00Z");
+        envelope.put("producer", "metrics-service");
+        envelope.put("payload", payload);
+
+        assertThatThrownBy(() -> consumer.onMessage(jsonMessage(envelope)))
+                .isInstanceOf(AmqpRejectAndDontRequeueException.class);
+
+        verifyNoInteractions(consumeRecordMapper, evaluationService);
+    }
+    @Test
     void evaluationExceptionPropagates() {
         when(consumeRecordMapper.existsConsumed(AlertMessageConsumer.CONSUMER_NAME, EVENT_ID)).thenReturn(false);
         doThrow(new RuntimeException("db unavailable")).when(evaluationService).evaluate(any());
@@ -116,6 +156,14 @@ class AlertMessageConsumerTests {
         assertThatThrownBy(() -> consumer.onMessage(envelopeMessage(EVENT_ID, 1)))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("db unavailable");
+    }
+
+    private Message jsonMessage(Map<String, Object> envelope) {
+        try {
+            return new Message(objectMapper.writeValueAsBytes(envelope), new MessageProperties());
+        } catch (Exception exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 
     private Message envelopeMessage(String eventId, int schemaVersion) {
@@ -127,7 +175,7 @@ class AlertMessageConsumerTests {
     private String envelopeJson(String eventId, int schemaVersion) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("server_id", 1L);
-        payload.put("message_id", "msg-0001");
+        payload.put("message_id", "1a08f7b1-51c8-4b46-929a-8879f349a3a2");
         payload.put("collected_at", "2026-07-31T07:59:59Z");
         payload.put("cpu_percent", 80.5);
         payload.put("memory_percent", 70.1);

@@ -23,9 +23,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 提交完成后才返回，天然满足"仅在业务事务成功后 ACK"；异常不返回则不 ACK，
  * 由容器级有限重试（{@link AlertRabbitConfig}）处理后 reject 进 DLQ。</p>
  *
- * <p>错误分类：JSON 解析失败 / schema_version 不支持 / event_type 不符属
- * 不可重试数据错误 → {@link AmqpRejectAndDontRequeueException} 直接进 DLQ；
- * 其余异常抛出，由容器级重试（有限次数）处理后 reject 进 DLQ。</p>
+     * <p>错误分类：JSON 解析失败、信封/载荷字段不符合冻结契约（含 UUID、时间、
+     * producer 和数值范围）、schema_version 不支持、event_type 不符属不可重试数据错误
+     * → {@link AmqpRejectAndDontRequeueException} 直接进 DLQ；其余异常抛出，由容器级
+     * 重试（有限次数）处理后 reject 进 DLQ。</p>
  */
 @Slf4j
 @Component
@@ -46,14 +47,18 @@ public class AlertMessageConsumer {
 
     private final Clock clock;
 
+    private final MetricsReportedMessageValidator messageValidator;
+
     /** 注入反序列化器、评估服务、幂等记录数据访问与事务模板。 */
     public AlertMessageConsumer(ObjectMapper objectMapper, AlertEvaluationService evaluationService,
-            ConsumeRecordMapper consumeRecordMapper, TransactionTemplate transactionTemplate, Clock clock) {
+            ConsumeRecordMapper consumeRecordMapper, TransactionTemplate transactionTemplate, Clock clock,
+            MetricsReportedMessageValidator messageValidator) {
         this.objectMapper = objectMapper;
         this.evaluationService = evaluationService;
         this.consumeRecordMapper = consumeRecordMapper;
         this.transactionTemplate = transactionTemplate;
         this.clock = clock;
+        this.messageValidator = messageValidator;
     }
 
     /**
@@ -93,6 +98,12 @@ public class AlertMessageConsumer {
             log.warn("consume rejected: unsupported schemaVersion={} or eventType={}",
                     envelope.schemaVersion(), envelope.eventType());
             throw new AmqpRejectAndDontRequeueException("unsupported schema version or event type");
+        }
+        try {
+            messageValidator.validate(envelope);
+        } catch (IllegalArgumentException exception) {
+            log.warn("consume rejected: invalid metrics event contract");
+            throw new AmqpRejectAndDontRequeueException("invalid metrics event contract", exception);
         }
         return envelope;
     }

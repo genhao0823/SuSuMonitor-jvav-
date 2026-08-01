@@ -135,7 +135,7 @@
 - 可选字段 `trace_id`/`correlation_id` 本阶段（MVP-10）不携带，消费侧不得要求必填。
 - 真实 Broker 验收已核对出队消息与本文契约一致（verify-outbox.mjs）。
 
-仍属 MVP-11：JSON Schema 运行校验、`message_consume_records`、消费幂等与 DLQ 分类执行。
+仍属 MVP-11：完整 JSON Schema 引擎、`message_consume_records`、消费幂等与 DLQ 分类执行。
 
 ## 八、实现确认（2026-07-31，MVP-11 消费侧落地）
 
@@ -143,7 +143,10 @@
 
 - `MetricsReportedMessage` record 反序列化：信封字段 snake_case 与 §三 示例逐字段一致（含 `producer=metrics-service` 断言）。
 - 契约常量 `EVENT_TYPE`/`SCHEMA_VERSION` 由 `OutboxEnvelopeFactory` 公开，发布/消费两侧同一来源，杜绝硬编码漂移。
-- 不可重试数据错误分类执行（§五）：JSON 无法解析、`schema_version≠1`、`event_type` 不符 → `AmqpRejectAndDontRequeueException` → 零重试进 DLQ（真实验收 C3）。
+- 不可重试数据错误分类执行（§五）：JSON 无法解析、`schema_version≠1`、`event_type` 不符，
+  以及字段级契约校验失败（event/message UUID、`producer`、UTC 时间、必填 payload、
+  server_id、百分比/非负数/used≤total 不变量）→ `AmqpRejectAndDontRequeueException`
+  → 零重试进 DLQ；完整 JSON Schema 引擎仍未引入。
 - `message_consume_records` 落地（V15）：consumer+event_id 唯一键，消费幂等（真实验收：同 event_id 重投仅 1 行记录、无第二次业务效果）。
 - 时间口径：`occurred_at`/`collected_at` 解析沿用 UTC 秒级格式，消费记录 `consumed_at` 写入 UTC（应用时钟）。
-- JSON Schema 运行校验仍未引入（当前以字段级反序列化 + schema_version/event_type 校验覆盖不可重试分类；缺字段等畸形载荷会被拒绝进 DLQ）。
+- JSON Schema 运行校验仍未引入；已实现无外部依赖的字段级运行校验，确保畸形载荷在进入幂等查询和告警评估前直接拒绝进 DLQ。

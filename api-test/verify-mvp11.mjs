@@ -13,7 +13,7 @@
  * 检查项：
  *   C1 消息通道正常消费：合法信封 → 消费 + 评估 + alert.push + 告警记录
  *   C2 重复投递幂等：同 event_id 重投 → 无第二次业务效果（无新记录/无推送）
- *   C3 DLQ 分类：非法 JSON / schema_version=2 → 消费拒绝 → DLQ 出现消息
+ *   C3 DLQ 分类：非法 JSON / schema_version=2 / 字段契约非法 → 消费拒绝 → DLQ 出现消息
  */
 import crypto from 'node:crypto'
 import WebSocket from 'ws'
@@ -298,14 +298,22 @@ const badSchema = await publishEnvelope(
 )
 check('C3', badSchema.status === 200, 'schema_version=2 信封投递成功')
 
+const invalidContract = JSON.parse(envelope(crypto.randomUUID(), serverId, 101))
+const badContract = await publishEnvelope(JSON.stringify(invalidContract))
+check('C3', badContract.status === 200, '字段契约非法信封投递成功')
+
 const dlqDeadline = Date.now() + waitTimeoutMs
 let dlqAfter = 0
 while (Date.now() < dlqDeadline) {
   dlqAfter = await queueMessages(QUEUE_DLQ)
-  if (dlqAfter >= dlqBefore + 2) break
+  if (dlqAfter >= dlqBefore + 3) break
   await new Promise((resolve) => setTimeout(resolve, 500))
 }
-check('C3', dlqAfter >= dlqBefore + 2, `两类不可重试消息均进入 DLQ（before=${dlqBefore}, after=${dlqAfter}）`)
+check('C3', dlqAfter >= dlqBefore + 3,
+  `三类不可重试消息均进入 DLQ（before=${dlqBefore}, after=${dlqAfter}）`)
+
+monitor.close()
+await new Promise((resolve) => monitor.once('close', resolve))
 
 console.log(`\nMVP-11 验收 PASS：${checks.filter((id) => id.startsWith('C')).length} 项消费侧检查项全部通过`)
 console.log(`  event_id 示例：${eventId1}`)
