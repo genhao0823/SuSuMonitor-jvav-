@@ -95,10 +95,15 @@ susumonitor:
     enabled: ${OUTBOX_ENABLED:true}
     exchange: ${OUTBOX_EXCHANGE:susumonitor.events}
     routing-key: ${OUTBOX_ROUTING_KEY:metrics.reported.v1}
-    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
+    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:200}
     batch-size: ${OUTBOX_BATCH_SIZE:100}
     publish-timeout-ms: ${OUTBOX_PUBLISH_TIMEOUT_MS:5000}
     max-backoff-seconds: ${OUTBOX_MAX_BACKOFF_SECONDS:300}
+    outbox-cleanup-enabled: ${OUTBOX_CLEANUP_ENABLED:false}
+    outbox-retention-days: ${OUTBOX_RETENTION_DAYS:30}
+    outbox-cleanup-cron: ${OUTBOX_CLEANUP_CRON:0 30 3 * * ?}
+    outbox-cleanup-batch-size: ${OUTBOX_CLEANUP_BATCH_SIZE:1000}
+    outbox-cleanup-max-batches-per-run: ${OUTBOX_CLEANUP_MAX_BATCHES_PER_RUN:100}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
     allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
