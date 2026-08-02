@@ -7,6 +7,20 @@
 [![Status](https://img.shields.io/badge/Sprint%201--4%20%E5%AE%8C%E6%88%90-brightgreen)](#%E5%BD%93%E5%89%8D%E8%BF%9B%E5%BA%A6)
 [![Docs](https://img.shields.io/badge/docs--alignment-2026--07--25-blue)](docs-SuMon/Bug-fix/2026-07-25-文档对齐性修复.md)
 
+## 🚀 首次上云端部署 + 基本功能闭环(2026-08-02,Polish 5)
+
+| 项 | 状态 / 值 |
+|---|---|
+| GitHub 仓库 | <https://github.com/genhao0823/SuSuMonitor-jvav-> |
+| 本次 tag | [`v0.5.0-cloud`](https://github.com/genhao0823/SuSuMonitor-jvav-/releases/tag/v0.5.0-cloud) |
+| 推送范围 | `main` HEAD(`e7f713f`,MVP-11 收口 commit) + 1 个 README 标注 commit |
+| 认证方式 | Git Credential Manager(Windows 凭据管理器缓存,无需明文 token) |
+| 基本功能闭环 | 鉴权(JWT 72h)/ 服务器 CRUD / SSH 测试 / MCP 终端 / Dashboard 真实指标 / 告警评估(MVP-6)/ Metrics Outbox(MVP-10)/ 告警消息消费(MVP-11) 全链路本机 + 真实 broker 验收通过 |
+| 首次上云端部署 | 腾讯云 OpenCloudOS 公网明文 HTTP 已跑通(2026-07-31,前端 5173 + 后端 18080 + Agent 8089 + RabbitMQ 5672,端到端联调 PASS),详见 `docs-SuMon/Handoff-SuMon/20260731-云端部署调试交接.md` |
+| 已知遗留 | HTTPS/WSS 待域名备案后才切 TLS;78 项本地 dirty(MVP-11 验证脚本 / `20260801` 单实例后端可靠性规划等)留作下一轮 commit;`Dockerfile/docker-compose` 仍属增强阶段 |
+
+> 本节由 Polish 5(2026-08-02)推送时追加,仅文档层。未删除任何现有段落。
+
 > **文档进度对齐说明（2026-07-25 修订，仅文档层）**
 >
 > 本节由本次“文档与实际开发进度对齐”修订添加，仅追加、未删除原文段落、未改动任何代码或配置。**修订时间：2026-07-25。** 状态标签定义：
@@ -19,6 +33,9 @@
 > | **未验证** | 代码已实现但未在真实环境跑过 |
 > | **计划中** | 仅出现在 plan 文档，未进入开发 |
 > | **outdated** | 文档陈旧但保留作历史快照 |
+>
+> **总体状态（2026-08-01 文档对齐修订，仅文档层，逐项核对代码事实）**：
+> 本次修订把"仓库结构/启动指南/协议工具"等历史段与代码事实对齐：OpenAPI 5 文件 29 端点（含 `openapi-alert.json`）、WS 协议 v1.1、views 13 个页面组件、dev-log 90+、Flyway V1-V17、JWT 默认 72h；Agent 启动改为纯环境变量方式（无 `--config` 命令行参数）；MVP-10/MVP-11 已合入 `main` 跟踪。
 >
 > **总体状态（2026-07-31 对齐说明，详见 `docs-SuMon/Use-manual/README.md`）**：
 > **MVP-8 运维文档完成（2026-07-31）**：Use-manual 手册系列落地（Server 部署安装 / 升级与回滚 / 备份与恢复 / 安全检查 / RabbitMQ 运维 + Go-Agent 手册索引）；配套 `deploy/backup.sh` 与 `deploy/restore.sh`（补齐 DEPLOYMENT.md 明言的"无备份脚本"空白）；恢复与安全检查两大空白已系统化；TLS/HTTPS 仍待域名备案（手册含计划与边界）。
@@ -161,16 +178,16 @@ SuSuMonitor 是一套**前后端 + Agent 全栈**的服务器监控系统,主题
 SuSuMonitor(Jvav)/
 ├── web-vue-SuMon/          # 前端 SPA(5173 端口 dev server)
 │   ├── src/
-│   │   ├── views/         # 10 个页面组件(含 AuthLayout / Login / Register / Dashboard / ServerList / ServerDetail / Metrics / AdminUsers / Forbidden / NotFound)
-│   │   ├── components/    # 15 个 SFC + 2 个 .spec.ts(含 PageHeader / ServerSparkLine / ServerFormDialog 等)
-│   │   ├── api/           # 7 个 HTTP 模块
+│   │   ├── views/         # 13 个页面组件(含 AuthLayout / Login / Register / Dashboard / ServerList / ServerDetail / Metrics / AdminUsers / Forbidden / NotFound / AlertRecords / AlertRules / Terminal)
+│   │   ├── components/    # 15+ 个 SFC(含 PageHeader / ServerSparkLine / ServerFormDialog / Dashboard* 系列等)
+│   │   ├── api/           # 9 个 HTTP 模块(auth / system / server / agent-token / metrics / alert / admin / websocket 等)
 │   │   ├── stores/        # Pinia stores + 2 个 spec
-│   │   ├── services/      # WebSocket 客户端
+│   │   ├── services/      # WebSocket 客户端(Monitor 通道 + 终端复用)
 │   │   ├── composables/   # useRouterLoading + 1 spec
 │   │   ├── utils/         # format + animate + 2 spec
 │   │   ├── types/         # API 类型 + error-code + metrics
 │   │   └── router/        # index + guards
-│   ├── scripts/           # 4 个工具(1 openapi + 1 audit + 1 api-e2e + 1 ui-e2e)
+│   ├── scripts/           # 工具(openapi / audit / api-e2e / ui-e2e)
 │   └── vitest.config.ts
 ├── server-java-SuMon/       # Java 后端(18080 端口)
 │   └── src/main/java/com/susumonitor/server/
@@ -190,12 +207,12 @@ SuSuMonitor(Jvav)/
 │       ├── wsclient/       # 客户端连接(重连 + 心跳)
 │       └── config/         # 配置加载
 ├── docs-SuMon/              # 项目文档
-│   ├── Develop-log/         # 67 dev-log(实施记录)
-│   ├── Develop-plans/       # 18 plan(规划)
-│   ├── OpenApi-SuMon/       # 4 个 OpenAPI 契约 JSON(auth / server / system / admin),共 23 个 endpoint
-│   ├── Protocol-SuMon/     # WebSocket 协议(v1.0)
-│   ├── Bug-fix/             # 5 个 bug 修复记录(含 4 项 2026-07-21 已修复 + 1 项 2026-07-25 文档对齐性修复)
-│   ├── 本机开发环境配置.md   # 本机开发约定(JWT/AES/SSH/Metrics 环境变量)
+│   ├── Develop-log/         # 90+ dev-log(实施记录)
+│   ├── Develop-plans/       # 10 plan(规划)
+│   ├── OpenApi-SuMon/       # 5 个 OpenAPI 契约 JSON(auth / server / system / admin / alert),共 29 个 endpoint
+│   ├── Protocol-SuMon/     # WebSocket 协议(v1.1)
+│   ├── Bug-fix/             # 9 篇 bug 修复记录 + README 索引
+│   ├── 本机开发环境配置.md   # 本机开发约定(JWT/AES/SSH/Metrics/Outbox 环境变量)
 │   └── Summary-Technology/  # 项目架构总览
 ├── api-test/                # API 集成测试(Apifox + curl + WS 验证)
 ├── scripts/                 # PowerShell 脚本(初始化 / 测试 / 数据库)
@@ -210,7 +227,7 @@ SuSuMonitor(Jvav)/
 - Node.js >= 18.18
 - npm >= 9
 - JDK 17+(server)
-- Go 1.21+(agent)
+- Go 1.23+(agent，`go.mod` 要求 1.23)
 - MySQL 8.0(server)
 
 ### 前端(`web-vue-SuMon/`)
@@ -234,7 +251,7 @@ npm run ui:e2e             # 浏览器 17 路径
 
 ```bash
 go build -o susumonitor-agent ./cmd/susumonitor-agent
-./susumonitor-agent --config config/agent.yml
+./susumonitor-agent    # 纯环境变量加载，无命令行参数（配置项见 agent-go-SuMon/README.md）
 ```
 
 ## 涂山 IP 使用范围
@@ -264,8 +281,8 @@ go build -o susumonitor-agent ./cmd/susumonitor-agent
 
 ## 协议 / 工具
 
-- **OpenAPI 契约**:`docs-SuMon/OpenApi-SuMon/{openapi-auth,server,system,admin}.json`(4 个文件 / 23 个 endpoint)
-- **WebSocket 协议**:`docs-SuMon/Protocol-SuMon/websocket-protocol.md`
+- **OpenAPI 契约**:`docs-SuMon/OpenApi-SuMon/{openapi-auth,server,system,admin,alert}.json`(5 个文件 / 29 个 endpoint)
+- **WebSocket 协议**:`docs-SuMon/Protocol-SuMon/websocket-protocol.md`(v1.1)
 - **后端 OpenAPI 自动化**:`web-vue-SuMon/scripts/check-openapi.mjs`(pre-commit 钩子)
 - **代码质量门**:`web-vue-SuMon/scripts/audit-catchup.mjs`(11 条规则)
 - **API E2E**:`web-vue-SuMon/scripts/api-e2e-test.mjs`
